@@ -2,11 +2,11 @@
   if (typeof window === "undefined") return;
 
   const DROPDOWN_CONFIGS = [
-    { id: "people-tag-filter", placeholder: "Filter by tags", singular: "tag", plural: "tags" },
-    { id: "people-tool-filter", placeholder: "Filter by tools", singular: "tool", plural: "tools" },
+    { id: "people-tag-filter", placeholder: "Filtrar por etiquetas", singular: "etiqueta", plural: "etiquetas" },
+    { id: "people-tool-filter", placeholder: "Filtrar por herramientas", singular: "herramienta", plural: "herramientas" },
   ];
   const CREATE_TRIGGER_ID = "the-list-create-profile-trigger";
-  const CREATE_PAGE_PATH = "/recetas/";
+  const CREATE_PAGE_PATH = "/receta/?create=1";
   const ALL_VALUE = "all";
 
   const ensureRoot = () => {
@@ -119,8 +119,8 @@
 
   const summaryText = (count, config) => {
     if (count <= 0) return config.placeholder;
-    if (count === 1) return `1 ${config.singular} selected`;
-    return `${count} ${config.plural} selected`;
+    if (count === 1) return `1 ${config.singular} seleccionada`;
+    return `${count} ${config.plural} seleccionadas`;
   };
 
   const stripNativeTick = (node) => {

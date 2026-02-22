@@ -82,7 +82,7 @@
       deleteDlg.style.pointerEvents = 'auto';
     } else {
       const deleteBtn = getDeleteBtn();
-      if (deleteBtn && window.confirm('Are you sure you want to delete this row?')) {
+      if (deleteBtn && window.confirm('¿Seguro que quieres eliminar esta fila?')) {
         deleteBtn.click();
       }
     }
@@ -173,7 +173,7 @@
       cell.appendChild(input);
     });
     btn.dataset.originalLabel = btn.dataset.originalLabel || btn.textContent || '✏️';
-    btn.textContent = 'Save';
+    btn.textContent = 'Guardar';
     btn.classList.add('save-mode');
     btn.disabled = false;
     const firstInput = rowEl.querySelector('td[data-column] input.inline-editor-input');
@@ -228,7 +228,7 @@
     if (!rowEl) return;
     if (rowEl.classList.contains('row-editing')) {
       btn.disabled = true;
-      btn.textContent = 'Saving...';
+      btn.textContent = 'Guardando...';
       submitInlineEdit(rowEl);
     } else {
       if (currentEditingRow && currentEditingRow !== rowEl) {

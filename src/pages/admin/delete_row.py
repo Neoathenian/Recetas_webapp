@@ -27,7 +27,7 @@ def delete_row(info_json: str, rows_json: str, index_value: str):
     if not index_value:
         return (
             gr.update(),
-            "Select a row before deleting.",
+            "Selecciona una fila antes de eliminar.",
             rows_json,
             gr.update(),
             gr.update(),
@@ -38,7 +38,7 @@ def delete_row(info_json: str, rows_json: str, index_value: str):
     if idx < 0 or idx >= len(rows):
         return (
             gr.update(),
-            "Row index out of range.",
+            "Índice de fila fuera de rango.",
             rows_json,
             gr.update(),
             gr.update(),
@@ -64,7 +64,7 @@ def delete_row(info_json: str, rows_json: str, index_value: str):
     headers = [col.name for col in table.columns] or [""]
     return (
         html,
-        f"✅ Row deleted. {summary}",
+        f"✅ Fila eliminada. {summary}",
         json.dumps(serialize_rows(refreshed_rows)),
         gr.update(
             headers=headers,

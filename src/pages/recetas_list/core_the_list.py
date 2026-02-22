@@ -3,17 +3,20 @@ from __future__ import annotations
 import html
 import json
 import logging
+import os
 import re
 import time
-from pathlib import Path
 from typing import Dict, List, Sequence, Tuple
 
 import gradio as gr
+from google.api_core.exceptions import NotFound
 
-TAG_FILTER_ALL_OPTION = "All"
-TOOL_FILTER_ALL_OPTION = "All"
+from src.gcs_storage import download_bytes, get_bucket, storage_client, upload_bytes
+
+TAG_FILTER_ALL_OPTION = "Todas"
+TOOL_FILTER_ALL_OPTION = "Todas"
 DEFAULT_CARD_COLOR = "rgb(118, 161, 146)"
-RECIPES_DIR = Path(__file__).resolve().parents[3] / "data" / "recipes"
+RECIPES_PREFIX = (os.getenv("RECETAS_RECIPES_PREFIX") or "recipes").strip("/ ")
 RGB_RE = re.compile(r"^rgb\s*\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$", re.IGNORECASE)
 TRANSPARENT_PIXEL_DATA_URL = "data:image/gif;base64,R0lGODlhAQABAAAAACw="
 RECIPE_ICON_TOTAL_TIME = (
@@ -47,40 +50,52 @@ def _log_timing(event_name: str, start: float, **fields: object) -> None:
 
 def _slugify(value: str) -> str:
     normalized = re.sub(r"[^a-z0-9]+", "-", str(value or "").strip().lower())
-    return normalized.strip("-") or "recipe"
+    return normalized.strip("-") or "receta"
 
 
-def _recipe_path_for_slug(slug: str) -> Path:
-    return RECIPES_DIR / f"{_slugify(slug)}.json"
+def _recipe_blob_name_for_slug(slug: str) -> str:
+    return f"{RECIPES_PREFIX}/{_slugify(slug)}.json"
+
+
+def _recipe_slug_from_blob_name(blob_name: str) -> str:
+    name = str(blob_name or "").strip().split("/")[-1]
+    if name.endswith(".json"):
+        name = name[:-5]
+    return _slugify(name)
 
 
 def _read_recipe_payload(slug: str) -> Dict[str, object] | None:
-    recipe_path = _recipe_path_for_slug(slug)
+    blob_name = _recipe_blob_name_for_slug(slug)
     try:
-        payload = json.loads(recipe_path.read_text(encoding="utf-8"))
+        raw = download_bytes(blob_name)
+        payload = json.loads(raw.decode("utf-8"))
     except FileNotFoundError:
         return None
+    except NotFound:
+        return None
     except json.JSONDecodeError as exc:
-        logger.warning("Recipe payload `%s` has invalid JSON: %s", recipe_path.name, exc)
+        logger.warning("Recipe payload `%s` has invalid JSON: %s", blob_name, exc)
         return None
 
     if not isinstance(payload, dict):
-        logger.warning("Recipe payload `%s` is not a JSON object", recipe_path.name)
+        logger.warning("Recipe payload `%s` is not a JSON object", blob_name)
         return None
     return payload
 
 
 def _write_recipe_payload(slug: str, payload: Dict[str, object]) -> bool:
-    recipe_path = _recipe_path_for_slug(slug)
+    blob_name = _recipe_blob_name_for_slug(slug)
     try:
-        recipe_path.parent.mkdir(parents=True, exist_ok=True)
-        recipe_path.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
+        body = (json.dumps(payload, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+        upload_bytes(
+            body,
+            blob_name,
+            content_type="application/json; charset=utf-8",
+            cache_seconds=0,
         )
         return True
     except Exception as exc:  # noqa: BLE001
-        logger.exception("Failed writing recipe payload `%s`: %s", recipe_path, exc)
+        logger.exception("Failed writing recipe payload `%s`: %s", blob_name, exc)
         return False
 
 
@@ -206,12 +221,12 @@ def _parse_steps(value: object) -> List[str]:
 def _display_name_from_slug(slug: str) -> str:
     parts = [chunk for chunk in re.split(r"[-_]+", str(slug or "").strip()) if chunk]
     if not parts:
-        return "Recipe"
+        return "Receta"
     return " ".join(part.capitalize() for part in parts)
 
 
-def _recipe_from_payload(payload: Dict[str, object], file_path: Path) -> Dict[str, object]:
-    slug = _slugify(str(payload.get("slug") or file_path.stem))
+def _recipe_from_payload(payload: Dict[str, object], slug_hint: str = "") -> Dict[str, object]:
+    slug = _slugify(str(payload.get("slug") or slug_hint))
     name = _string_or_default(payload.get("Name") or payload.get("name"), _display_name_from_slug(slug))
 
     ingredients = _parse_ingredients(payload.get("Ingredients") or payload.get("ingredients"))
@@ -219,15 +234,15 @@ def _recipe_from_payload(payload: Dict[str, object], file_path: Path) -> Dict[st
 
     preparation_time = _string_or_default(
         payload.get("Preparation time") or payload.get("preparation_time"),
-        "Not specified",
+        "No especificado",
     )
     total_time = _string_or_default(
         payload.get("Total time") or payload.get("total_time"),
-        "Not specified",
+        "No especificado",
     )
     persons = _string_or_default(
         payload.get("N\u00bapersonas") or payload.get("n_personas") or payload.get("persons"),
-        "Not specified",
+        "No especificado",
     )
 
     return {
@@ -245,31 +260,47 @@ def _recipe_from_payload(payload: Dict[str, object], file_path: Path) -> Dict[st
     }
 
 
-def _load_recipe_from_file(file_path: Path) -> Dict[str, object] | None:
+def _load_recipe_from_blob(blob_name: str) -> Dict[str, object] | None:
     try:
-        payload = json.loads(file_path.read_text(encoding="utf-8"))
+        payload = json.loads(download_bytes(blob_name).decode("utf-8"))
     except FileNotFoundError:
         return None
+    except NotFound:
+        return None
     except json.JSONDecodeError as exc:
-        logger.warning("Skipping recipe `%s`: invalid JSON (%s)", file_path.name, exc)
+        logger.warning("Skipping recipe `%s`: invalid JSON (%s)", blob_name, exc)
         return None
 
     if not isinstance(payload, dict):
-        logger.warning("Skipping recipe `%s`: payload must be a JSON object", file_path.name)
+        logger.warning("Skipping recipe `%s`: payload must be a JSON object", blob_name)
         return None
-    return _recipe_from_payload(payload, file_path)
+    return _recipe_from_payload(payload, slug_hint=_recipe_slug_from_blob_name(blob_name))
 
 
 def _fetch_all_people() -> List[Dict[str, object]]:
     total_start = time.perf_counter()
     recipes: List[Dict[str, object]] = []
 
-    if not RECIPES_DIR.exists():
-        _log_timing("fetch_all_recipes.empty_directory", total_start, path=str(RECIPES_DIR))
+    prefix = f"{RECIPES_PREFIX}/"
+    try:
+        client = storage_client()
+        bucket = client.bucket(get_bucket().name)
+        blobs = sorted(
+            (
+                str(getattr(blob, "name", "") or "").strip()
+                for blob in client.list_blobs(bucket, prefix=prefix)
+            ),
+            key=str.lower,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Failed listing recipe blobs for prefix `%s`: %s", prefix, exc)
+        _log_timing("fetch_all_recipes.list_error", total_start, prefix=prefix)
         return recipes
 
-    for recipe_path in sorted(RECIPES_DIR.glob("*.json")):
-        recipe = _load_recipe_from_file(recipe_path)
+    for blob_name in blobs:
+        if not blob_name.endswith(".json"):
+            continue
+        recipe = _load_recipe_from_blob(blob_name)
         if recipe is None:
             continue
         recipes.append(recipe)
@@ -467,7 +498,7 @@ def _filter_people_for_tool_selection(
     )
 
 
-def _render_tag_chips(tags: Sequence[str], *, empty_label: str = "no-tags") -> str:
+def _render_tag_chips(tags: Sequence[str], *, empty_label: str = "sin-etiquetas") -> str:
     if not tags:
         return f'<span class="person-tag person-tag--muted">{html.escape(empty_label)}</span>'
     parts: List[str] = []
@@ -478,12 +509,12 @@ def _render_tag_chips(tags: Sequence[str], *, empty_label: str = "no-tags") -> s
 
 
 def _render_recipe_hero(recipe: Dict[str, object]) -> str:
-    name = html.escape(str(recipe.get("name") or "Recipe"))
+    name = html.escape(str(recipe.get("name") or "Receta"))
     card_color = html.escape(str(recipe.get("card_image") or DEFAULT_CARD_COLOR), quote=True)
-    total_time = html.escape(str(recipe.get("total_time") or "Not specified"))
-    persons = html.escape(str(recipe.get("persons") or "Not specified"))
-    tags_markup = _render_tag_chips(recipe.get("tags", []), empty_label="no-tags")
-    tools_markup = _render_tag_chips(recipe.get("tools", []), empty_label="no-tools")
+    total_time = html.escape(str(recipe.get("total_time") or "No especificado"))
+    persons = html.escape(str(recipe.get("persons") or "No especificado"))
+    tags_markup = _render_tag_chips(recipe.get("tags", []), empty_label="sin-etiquetas")
+    tools_markup = _render_tag_chips(recipe.get("tools", []), empty_label="sin-herramientas")
     image_route = str(recipe.get("card_image_file") or "").strip()
     image_src = html.escape(image_route or TRANSPARENT_PIXEL_DATA_URL, quote=True)
     image_class = "recipe-card-color__image"
@@ -512,7 +543,7 @@ def _render_recipe_hero(recipe: Dict[str, object]) -> str:
           <div class="recipe-meta-item">
             <div class="recipe-meta-item__icon-wrap">{RECIPE_ICON_TOTAL_TIME}</div>
             <div class="recipe-meta-item__content">
-              <span>Total time</span>
+              <span>Tiempo total</span>
               <strong class="recipe-meta-item__value recipe-meta-item__value--total-time">{total_time}</strong>
             </div>
           </div>
@@ -525,11 +556,11 @@ def _render_recipe_hero(recipe: Dict[str, object]) -> str:
           </div>
         </div>
         <div class="recipe-chip-section">
-          <span class="recipe-chip-title">Tags</span>
+          <span class="recipe-chip-title">Etiquetas</span>
           <div class="person-detail-card__tags" data-tag-catalog="{tag_catalog_json}" data-inline-field-id="the-list-card-proposal-tags">{tags_markup}</div>
         </div>
         <div class="recipe-chip-section">
-          <span class="recipe-chip-title">Tools</span>
+          <span class="recipe-chip-title">Herramientas</span>
           <div class="person-detail-card__tags person-detail-card__tools" data-tag-catalog="{tool_catalog_json}" data-inline-field-id="the-list-card-proposal-tools">{tools_markup}</div>
         </div>
         <div id="person-detail-card-inline-actions-slot" class="person-detail-card__inline-actions-slot"></div>
@@ -560,19 +591,19 @@ def _generate_recipe_markdown(recipe: Dict[str, object]) -> str:
     for index, step in enumerate(steps, start=1):
         step_lines.append(f"{index}. {str(step or '').strip()}".strip())
 
-    total_time = str(recipe.get("total_time") or "Not specified").strip()
-    persons = str(recipe.get("persons") or "Not specified").strip()
-    tags = ", ".join(str(tag or "").strip() for tag in recipe.get("tags", [])) or "No tags"
-    tools = ", ".join(str(tool or "").strip() for tool in recipe.get("tools", [])) or "No tools"
-    ingredients_block = "\n".join(ingredient_lines) if ingredient_lines else "- No ingredients provided."
-    steps_block = "\n".join(step_lines) if step_lines else "1. No preparation steps provided."
+    total_time = str(recipe.get("total_time") or "No especificado").strip()
+    persons = str(recipe.get("persons") or "No especificado").strip()
+    tags = ", ".join(str(tag or "").strip() for tag in recipe.get("tags", [])) or "Sin etiquetas"
+    tools = ", ".join(str(tool or "").strip() for tool in recipe.get("tools", [])) or "Sin herramientas"
+    ingredients_block = "\n".join(ingredient_lines) if ingredient_lines else "- No se proporcionaron ingredientes."
+    steps_block = "\n".join(step_lines) if step_lines else "1. No se proporcionaron pasos de preparación."
 
     return (
-        "## Recipe Summary\n"
-        f"- **Total time:** {total_time}\n"
+        "## Resumen de la receta\n"
+        f"- **Tiempo total:** {total_time}\n"
         f"- **N\u00bapersonas:** {persons}\n"
-        f"- **Tags:** {tags}\n"
-        f"- **Tools:** {tools}\n\n"
+        f"- **Etiquetas:** {tags}\n"
+        f"- **Herramientas:** {tools}\n\n"
         "## Ingredientes\n"
         f"{ingredients_block}\n\n"
         "## Preparación\n"
@@ -614,7 +645,7 @@ def _render_recipe_markdown(recipe: Dict[str, object]) -> str:
 
     if not ingredient_items:
         ingredient_items.append(
-            "<li class='recipe-ingredients-list__item recipe-ingredients-list__item--empty'>No ingredients provided.</li>"
+            "<li class='recipe-ingredients-list__item recipe-ingredients-list__item--empty'>No se proporcionaron ingredientes.</li>"
         )
 
     step_items: List[str] = []
@@ -632,7 +663,7 @@ def _render_recipe_markdown(recipe: Dict[str, object]) -> str:
     if not step_items:
         step_items.append(
             "<li class='recipe-steps-list__item recipe-steps-list__item--empty'>"
-            "<span class='recipe-steps-list__text'>No preparation steps provided.</span>"
+            "<span class='recipe-steps-list__text'>No se proporcionaron pasos de preparación.</span>"
             "</li>"
         )
 

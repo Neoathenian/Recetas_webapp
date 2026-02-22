@@ -35,7 +35,7 @@ def table_info_to_json(info: TableInfo) -> str:
 
 def table_info_from_json(info_json: str) -> TableInfo:
     if not info_json:
-        raise ValueError("Table metadata missing; select a table first.")
+        raise ValueError("Faltan metadatos de la tabla; selecciona primero una tabla.")
     data = json.loads(info_json)
     return TableInfo(
         name=data["name"],
@@ -101,13 +101,13 @@ def cast_value(value: Any, column: ColumnInfo) -> Any:
         return str(value)
     except Exception as exc:
         raise ValueError(
-            f"Invalid value '{value}' for column '{column.name}' ({column.data_type})"
+            f"Valor no válido '{value}' para la columna '{column.name}' ({column.data_type})"
         ) from exc
 
 
 def row_from_df(data: List[List[Any]], table: TableInfo) -> Dict[str, Any]:
     if not data or not data[0]:
-        raise ValueError("Provide values before saving.")
+        raise ValueError("Introduce valores antes de guardar.")
     row_data = data[0]
     values: Dict[str, Any] = {}
     for idx, column in enumerate(table.columns):
@@ -135,13 +135,13 @@ def _render_table_html(table: TableInfo, rows: List[Dict[str, Any]]) -> str:
         rows_html.append(
             f"<tr data-row='{idx}'><td class='cell-index'>{idx + 1}</td>{cell_html}"
             "<td class='actions'>"
-            f"<button class='edit-btn' data-row='{idx}' title='Edit row'>✏️</button>"
-            f"<button class='trash-btn' data-row='{idx}' title='Delete row'>🗑</button>"
+            f"<button class='edit-btn' data-row='{idx}' title='Editar fila'>✏️</button>"
+            f"<button class='trash-btn' data-row='{idx}' title='Eliminar fila'>🗑</button>"
             "</td></tr>"
         )
     if not rows_html:
         rows_html.append(
-            "<tr class='no-data'><td colspan='{0}'>No rows yet.</td></tr>".format(
+            "<tr class='no-data'><td colspan='{0}'>Aún no hay filas.</td></tr>".format(
                 len(column_names) + 2
             )
         )
@@ -228,7 +228,7 @@ def _render_table_html(table: TableInfo, rows: List[Dict[str, Any]]) -> str:
           <tr>
             <th>#</th>
             {header_cells}
-            <th>Actions</th>
+            <th>Acciones</th>
           </tr>
         </thead>
         <tbody>
@@ -245,6 +245,6 @@ def load_table_view(table_name: str) -> Tuple[TableInfo, List[Dict[str, Any]], s
     rows = fetch_rows(info)
     html = _render_table_html(info, rows)
     summary = (
-        f"{len(rows)} row{'s' if len(rows) != 1 else ''} in {table_name}."
+        f"{len(rows)} fila{'s' if len(rows) != 1 else ''} en {table_name}."
     )
     return info, rows, html, summary

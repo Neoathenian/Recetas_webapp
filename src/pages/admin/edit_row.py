@@ -25,10 +25,10 @@ def load_row_for_edit(info_json: str, rows_json: str, index_value: str):
     table = table_info_from_json(info_json)
     rows = rows_from_json(rows_json)
     if not index_value:
-        raise ValueError("No row selected.")
+        raise ValueError("No se seleccionó ninguna fila.")
     idx = int(float(index_value))
     if idx < 0 or idx >= len(rows):
-        raise ValueError("Row index out of range.")
+        raise ValueError("Índice de fila fuera de rango.")
 
     headers = [col.name for col in table.columns] or [""]
     values = (
@@ -44,7 +44,7 @@ def load_row_for_edit(info_json: str, rows_json: str, index_value: str):
             visible=True,
         ),
         gr.update(visible=True),
-        f"Editing row #{idx + 1} in {table.name}.",
+        f"Editando fila #{idx + 1} en {table.name}.",
         str(idx),
     )
 
@@ -58,7 +58,7 @@ def save_row(
     if not info_json:
         return (
             gr.update(),
-            "Select a table first.",
+            "Selecciona primero una tabla.",
             rows_json,
             gr.update(),
             gr.update(),
@@ -93,13 +93,13 @@ def save_row(
     try:
         if selected_index in ("new", "-1", ""):
             insert_row_in_db(table, new_row)
-            action = "inserted"
+            action = "insertada"
         else:
             idx = int(float(selected_index))
             if idx < 0 or idx >= len(rows):
-                raise ValueError("Row index out of range.")
+                raise ValueError("Índice de fila fuera de rango.")
             updated = update_row_in_db(table, rows[idx], new_row)
-            action = "updated" if updated else "unchanged"
+            action = "actualizada" if updated else "sin cambios"
     except Exception as exc:
         logger.exception("Failed to save row in %s", table.name)
         fallback_rows = editor_rows if editor_rows else [blank_row(table)]
@@ -121,7 +121,7 @@ def save_row(
     _, refreshed_rows, html, summary = load_table_view(table.name)
     return (
         html,
-        f"✅ Row {action}. {summary}",
+        f"✅ Fila {action}. {summary}",
         json.dumps(serialize_rows(refreshed_rows)),
         gr.update(
             headers=headers,
@@ -139,7 +139,7 @@ def save_inline_row(info_json: str, rows_json: str, payload_json: str):
     if not info_json:
         return (
             gr.update(),
-            "Select a table first.",
+            "Selecciona primero una tabla.",
             rows_json,
             gr.update(visible=False),
             gr.update(visible=False),
@@ -150,7 +150,7 @@ def save_inline_row(info_json: str, rows_json: str, payload_json: str):
     if not payload_json:
         return (
             gr.update(),
-            "Select a row before editing inline.",
+            "Selecciona una fila antes de editar en línea.",
             rows_json,
             gr.update(visible=False),
             gr.update(visible=False),
@@ -166,7 +166,7 @@ def save_inline_row(info_json: str, rows_json: str, payload_json: str):
     except json.JSONDecodeError:
         return (
             gr.update(),
-            "Invalid inline edit payload.",
+            "Carga de edición en línea no válida.",
             rows_json,
             gr.update(visible=False),
             gr.update(visible=False),
@@ -177,7 +177,7 @@ def save_inline_row(info_json: str, rows_json: str, payload_json: str):
     if not isinstance(payload, dict):
         return (
             gr.update(),
-            "Invalid inline edit payload.",
+            "Carga de edición en línea no válida.",
             rows_json,
             gr.update(visible=False),
             gr.update(visible=False),
@@ -193,7 +193,7 @@ def save_inline_row(info_json: str, rows_json: str, payload_json: str):
     if idx < 0 or idx >= len(rows):
         return (
             gr.update(),
-            "Row index out of range.",
+            "Índice de fila fuera de rango.",
             rows_json,
             gr.update(visible=False),
             gr.update(visible=False),
@@ -205,7 +205,7 @@ def save_inline_row(info_json: str, rows_json: str, payload_json: str):
     if not isinstance(values, dict):
         return (
             gr.update(),
-            "Inline edit payload missing values.",
+            "Faltan valores en la edición en línea.",
             rows_json,
             gr.update(visible=False),
             gr.update(visible=False),
@@ -271,10 +271,10 @@ def save_inline_row(info_json: str, rows_json: str, payload_json: str):
         )
 
     _, refreshed_rows, html, summary = load_table_view(table.name)
-    action = "updated" if updated else "unchanged"
+    action = "actualizada" if updated else "sin cambios"
     return (
         html,
-        f"✅ Row {action}. {summary}",
+        f"✅ Fila {action}. {summary}",
         json.dumps(serialize_rows(refreshed_rows)),
         gr.update(
             headers=headers,

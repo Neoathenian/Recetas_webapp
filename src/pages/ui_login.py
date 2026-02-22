@@ -8,12 +8,15 @@ def _header_root(request: gr.Request):
 
 def make_login_page() -> gr.Blocks:
     with gr.Blocks(
-        title="The List Control Center",
+        title="Centro de control de recetas",
         head=with_light_mode_head(None),
     ) as login_page:
         hdr = gr.HTML()
-        gr.Markdown("## Welcome\nYou can browse public pages as a guest. Sign in for contribution privileges.")
-        gr.Markdown("- Public information\n- Marketing copy\n- Anything you want here")
+        gr.Markdown(
+            "## Bienvenido\nPuedes explorar las páginas públicas como invitado. "
+            "Inicia sesión para tener privilegios de colaboración."
+        )
+        gr.Markdown("- Información pública\n- Contenido editorial\n- Lo que quieras mostrar aquí")
 
         login_page.load(timed_page_load("/", _header_root), outputs=[hdr])
 

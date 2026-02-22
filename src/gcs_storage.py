@@ -12,7 +12,13 @@ from google.oauth2 import service_account
 
 
 # Defaults can be overridden via env vars without touching code
-DEFAULT_BUCKET = os.getenv("BUCKET_NAME") or os.getenv("API_STORAGE_BUCKET", "api_information_storage")
+# `RECETAS_BUCKET_NAME` is the new canonical bucket for this app.
+DEFAULT_BUCKET = (
+    os.getenv("RECETAS_BUCKET_NAME")
+    or os.getenv("BUCKET_NAME")
+    or os.getenv("API_STORAGE_BUCKET")
+    or "recetas-bucket"
+)
 DEFAULT_KEYFILE = os.getenv("API_BUCKET_KEY_FILE", "secrets/api_bucket_db_key.json")
 
 

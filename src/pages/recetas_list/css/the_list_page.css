@@ -105,9 +105,9 @@
 
 #people-tag-filter,
 #people-tool-filter {
-  width: 170px;
-  max-width: 170px;
-  min-width: 130px;
+  width: 230px;
+  max-width: 230px;
+  min-width: 180px;
   --block-border-width: 0;
   --block-padding: 0;
   --block-background-fill: transparent;
@@ -163,6 +163,37 @@
 #people-tool-filter input[type="text"]::placeholder,
 #people-tool-filter .wrap input::placeholder {
   color: transparent !important;
+}
+
+#the-list-create-profile-trigger {
+  align-self: flex-end;
+  flex: 0 0 auto !important;
+  min-width: 0 !important;
+}
+
+#the-list-create-profile-trigger button,
+button#the-list-create-profile-trigger {
+  min-width: 42px !important;
+  width: 42px !important;
+  height: 42px !important;
+  border-radius: 999px !important;
+  padding: 0 !important;
+  border: 1px solid #b8c2cc !important;
+  background-color: #ffffff !important;
+  color: #154734 !important;
+  font-size: 1.4rem !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  box-shadow: none !important;
+}
+
+#the-list-create-profile-trigger button:hover,
+#the-list-create-profile-trigger button:focus-visible,
+button#the-list-create-profile-trigger:hover,
+button#the-list-create-profile-trigger:focus-visible {
+  border-color: #4b7a66 !important;
+  background-color: #f4faf7 !important;
+  box-shadow: 0 0 0 2px rgba(75, 122, 102, 0.15) !important;
 }
 
 .people-grid {
@@ -318,6 +349,7 @@
     max-width: none;
     min-width: 0;
     gap: 0.45rem;
+    flex-wrap: wrap;
   }
 
   #people-search {
@@ -329,8 +361,12 @@
 
   #people-tag-filter,
   #people-tool-filter {
-    width: min(46vw, 170px);
-    max-width: 170px;
-    min-width: 120px;
+    width: min(48vw, 220px);
+    max-width: 220px;
+    min-width: 140px;
+  }
+
+  #the-list-create-profile-trigger {
+    margin-left: auto;
   }
 }

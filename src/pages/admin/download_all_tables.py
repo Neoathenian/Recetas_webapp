@@ -54,7 +54,7 @@ def _table_to_csv_bytes(table: TableInfo, rows: Sequence[dict[str, Any]]) -> byt
 def _export_tables_zip() -> Tuple[Path, int, int]:
     tables = list_tables()
     if not tables:
-        raise ValueError("No tables available to export.")
+        raise ValueError("No hay tablas disponibles para exportar.")
 
     zip_path = Path(tempfile.gettempdir()) / f"the_list_tables-{uuid4().hex}.zip"
     total_rows = 0
@@ -76,10 +76,10 @@ def handle_download_all_tables():
         return gr.update(), f"❌ {exc}"
     except Exception as exc:  # pragma: no cover
         logger.exception("Failed to export tables to ZIP.")
-        return gr.update(), f"❌ Failed to export tables: {exc}"
+        return gr.update(), f"❌ Error al exportar tablas: {exc}"
 
     message = (
-        f"📦 Prepared download with {table_count} table{'s' if table_count != 1 else ''} "
-        f"and {row_count} row{'s' if row_count != 1 else ''}."
+        f"📦 Descarga preparada con {table_count} tabla{'s' if table_count != 1 else ''} "
+        f"y {row_count} fila{'s' if row_count != 1 else ''}."
     )
     return str(zip_path), message

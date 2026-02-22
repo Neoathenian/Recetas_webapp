@@ -44,7 +44,7 @@ from src.theory_taxonomy import (
 )
 
 def _store_unsorted_files_for_source(*args, **kwargs):
-    raise RuntimeError("Sources workflows are disabled in this recipes-only build.")
+    raise RuntimeError("Los flujos de fuentes están deshabilitados en esta versión solo de recetas.")
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +101,7 @@ REVIEW_VIEW_RAW = "raw"
 DEFAULT_REVIEW_VIEW = REVIEW_VIEW_COMPILED
 EDIT_TOGGLE_BUTTON_LABEL = " "
 REVIEW_BUTTON_ICON_SRC = "/images/the-list-review-icon.svg"
-TAG_FILTER_ALL_OPTION = "All"
+TAG_FILTER_ALL_OPTION = "Todas"
 PROPOSAL_SCOPE_ARTICLE = "article"
 LEGACY_PROPOSAL_SCOPE_DESCRIPTION = "description"
 PROPOSAL_SCOPE_CARD = "card"
@@ -120,8 +120,8 @@ _INLINE_LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 _INLINE_BOLD_RE = re.compile(r"\*\*([^*\n]+)\*\*")
 _INLINE_ITALIC_RE = re.compile(r"(?<!\*)\*([^*\n]+)\*(?!\*)")
 MARKDOWN_H1_RE = re.compile(r"(?m)^\s*#\s+(.+?)\s*$")
-MARKDOWN_TITLE_RE = re.compile(r"(?mi)^\s*-\s*\*\*(?:Bucket|Title)\*\*:\s*(.+?)\s*$")
-MARKDOWN_TAGS_RE = re.compile(r"(?mi)^\s*-\s*\*\*Tags\*\*:\s*(.+?)\s*$")
+MARKDOWN_TITLE_RE = re.compile(r"(?mi)^\s*-\s*\*\*(?:Bucket|Title|Título|Titulo)\*\*:\s*(.+?)\s*$")
+MARKDOWN_TAGS_RE = re.compile(r"(?mi)^\s*-\s*\*\*(?:Tags|Etiquetas)\*\*:\s*(.+?)\s*$")
 MARKDOWN_IMAGE_RE = re.compile(r"!\[[^\]]*]\(([^)]+)\)")
 REFERENCE_HEADING_LINE_RE = re.compile(r"^\s{0,3}#{1,6}\s+references\s*$", re.IGNORECASE)
 REFERENCE_DEFINITION_LINE_RE = re.compile(r"^\s*\[\d{1,4}\]\s*:.+$")
@@ -218,7 +218,7 @@ def _slugify(value: str) -> str:
 def _display_name_from_slug(slug: str) -> str:
     parts = [chunk for chunk in re.split(r"[-_]+", str(slug or "").strip()) if chunk]
     if not parts:
-        return "Unknown"
+        return "Desconocido"
     return " ".join(part.capitalize() for part in parts)
 
 
@@ -256,7 +256,7 @@ def _person_from_article_fallback(slug: str, markdown: str) -> Dict[str, object]
     name = str(heading_match.group(1)).strip() if heading_match else _display_name_from_slug(normalized_slug)
 
     title_match = MARKDOWN_TITLE_RE.search(markdown_value)
-    title = str(title_match.group(1)).strip() if title_match else "Unassigned"
+    title = str(title_match.group(1)).strip() if title_match else "Sin asignar"
 
     tags_match = MARKDOWN_TAGS_RE.search(markdown_value)
     tags = _parse_inline_tags(tags_match.group(1)) if tags_match else []
@@ -272,8 +272,8 @@ def _person_from_article_fallback(slug: str, markdown: str) -> Dict[str, object]
         "slug": normalized_slug,
         "person_id": 0,
         "name": name or _display_name_from_slug(normalized_slug),
-        "title": title or "Unassigned",
-        "bucket": title or "Unassigned",
+        "title": title or "Sin asignar",
+        "bucket": title or "Sin asignar",
         "image_url": image_url,
         "tags": tags,
         "markdown": markdown_value,
@@ -482,19 +482,19 @@ def _markdown_for_dummy_person(name: str, title: str, tags: Sequence[str], index
     strengths = "\n".join(f"- {tag.replace('-', ' ').title()}" for tag in tags)
     return (
         f"# {name}\n\n"
-        "## Snapshot\n"
-        f"- **Title:** {title}\n"
-        f"- **Tags:** {tags_md}\n"
-        f"- **Dummy ID:** P-{index:03d}\n\n"
-        "## Background\n"
-        f"{name} is a placeholder profile generated for testing card density, click-through navigation, and markdown rendering.\n\n"
-        "## Strengths\n"
+        "## Resumen\n"
+        f"- **Título:** {title}\n"
+        f"- **Etiquetas:** {tags_md}\n"
+        f"- **ID de prueba:** P-{index:03d}\n\n"
+        "## Contexto\n"
+        f"{name} es un perfil de relleno generado para probar densidad de tarjetas, navegación por clic y renderizado de markdown.\n\n"
+        "## Fortalezas\n"
         f"{strengths}\n\n"
-        "## Recent Notes\n"
-        "| Match | Result | Notes |\n"
+        "## Notas recientes\n"
+        "| Partido | Resultado | Notas |\n"
         "|---|---|---|\n"
-        f"| Friendly {index} | 2-1 | Created multiple high-value actions |\n"
-        f"| Friendly {index + 1} | 1-1 | Strong in transition and shape |\n"
+        f"| Amistoso {index} | 2-1 | Generó múltiples acciones de alto valor |\n"
+        f"| Amistoso {index + 1} | 1-1 | Fuerte en transición y estructura |\n"
     )
 
 
@@ -718,7 +718,7 @@ def _ensure_local_db_once() -> None:
                 INSERT INTO app.people_articles (person_slug, markdown)
                 SELECT
                     c.slug,
-                    '# ' || COALESCE(NULLIF(p.name, ''), c.slug) || E'\n\nProfile pending article content.'
+                    '# ' || COALESCE(NULLIF(p.name, ''), c.slug) || E'\n\nPerfil con contenido de artículo pendiente.'
                 FROM app.people_cards c
                 JOIN app.people p
                     ON p.id = c.person_id
@@ -741,13 +741,13 @@ def _ensure_local_db_once() -> None:
                 )
             ).scalar_one_or_none()
             if current_markdown is not None:
-                marker = "![Profile image preview]"
+                marker = "![Vista previa de imagen de perfil]"
                 current_markdown_str = str(current_markdown or "")
                 if marker not in current_markdown_str:
                     updated_markdown = (
                         current_markdown_str
-                        + "\n\n## Profile Image\n"
-                        + "![Profile image preview](/images/Logo_with_text.png)\n"
+                        + "\n\n## Imagen de perfil\n"
+                        + "![Vista previa de imagen de perfil](/images/Logo_with_text.png)\n"
                     )
                     session.execute(
                         text(
@@ -816,10 +816,10 @@ def _normalize_proposal_source(value: object) -> str:
 def _proposal_source_label(source: str) -> str:
     normalized_source = _normalize_proposal_source(source)
     if normalized_source == PROPOSAL_SOURCE_SOURCE:
-        return "SOURCE"
+        return "FUENTE"
     if normalized_source == PROPOSAL_SOURCE_THEORY:
-        return "THEORY"
-    return "PEOPLE"
+        return "TEORÍA"
+    return "RECETAS"
 
 
 def _normalize_source_proposal_type(value: object) -> str:
@@ -973,7 +973,7 @@ def _fetch_all_people() -> List[Dict[str, object]]:
                     SELECT
                         c.slug,
                         p.name,
-                        COALESCE(t.label, 'Unassigned') AS title,
+                        COALESCE(t.label, 'Sin asignar') AS title,
                         c.bucket,
                         c.image_url,
                         COALESCE(
@@ -1272,7 +1272,7 @@ def _fetch_person(slug: str) -> Dict[str, object] | None:
                         c.slug,
                         c.person_id,
                         p.name,
-                        COALESCE(t.label, 'Unassigned') AS title,
+                        COALESCE(t.label, 'Sin asignar') AS title,
                         c.bucket,
                         c.image_url,
                         COALESCE(
@@ -1361,7 +1361,7 @@ def _fetch_theory(slug: str) -> Dict[str, object] | None:
                         c.slug,
                         c.person_id,
                         p.name,
-                        COALESCE(t.label, 'Unassigned') AS title,
+                        COALESCE(t.label, 'Sin asignar') AS title,
                         c.bucket,
                         c.image_url,
                         COALESCE(
@@ -1525,38 +1525,38 @@ def _materialize_missing_profile_for_proposal(
     if normalized_scope == PROPOSAL_SCOPE_CARD:
         snapshot = _deserialize_card_snapshot(proposed_payload)
         seed_name = str(snapshot.get("name") or "").strip() or _display_name_from_slug(normalized_slug)
-        seed_title = str(snapshot.get("title") or "").strip() or "Unassigned"
+        seed_title = str(snapshot.get("title") or "").strip() or "Sin asignar"
         seed_tags = [_normalize_tag(str(tag)) for tag in snapshot.get("tags", []) if _normalize_tag(str(tag))]
         seed_image_url = (
             str(proposed_image_url or "").strip()
             or str(snapshot.get("image_url") or "").strip()
             or "/images/Logo.png"
         )
-        article_seed_markdown = f"# {seed_name}\n\nProfile pending article content."
+        article_seed_markdown = f"# {seed_name}\n\nPerfil con contenido de artículo pendiente."
     elif normalized_scope == PROPOSAL_SCOPE_CARD_ARTICLE:
         # Handle combined card+article payload
         combined = _deserialize_card_article_snapshot(proposed_payload)
         card_data = combined.get("card", {})
         seed_name = str(card_data.get("name") or "").strip() or _display_name_from_slug(normalized_slug)
-        seed_title = str(card_data.get("title") or "").strip() or "Unassigned"
+        seed_title = str(card_data.get("title") or "").strip() or "Sin asignar"
         seed_tags = [_normalize_tag(str(tag)) for tag in card_data.get("tags", []) if _normalize_tag(str(tag))]
         seed_image_url = (
             str(proposed_image_url or "").strip()
             or str(card_data.get("image_url") or "").strip()
             or "/images/Logo.png"
         )
-        article_seed_markdown = str(combined.get("article") or "").strip() or f"# {seed_name}\n\nProfile pending article content."
+        article_seed_markdown = str(combined.get("article") or "").strip() or f"# {seed_name}\n\nPerfil con contenido de artículo pendiente."
     else:
         article_seed = _person_from_article_fallback(normalized_slug, proposed_payload)
         seed_name = str(article_seed.get("name") or "").strip() or _display_name_from_slug(normalized_slug)
-        seed_title = str(article_seed.get("title") or "").strip() or "Unassigned"
+        seed_title = str(article_seed.get("title") or "").strip() or "Sin asignar"
         seed_tags = [
             _normalize_tag(str(tag))
             for tag in article_seed.get("tags", [])
             if _normalize_tag(str(tag))
         ]
         seed_image_url = str(article_seed.get("image_url") or "").strip() or "/images/Logo.png"
-        article_seed_markdown = str(proposed_payload or "").strip() or f"# {seed_name}\n\nProfile pending article content."
+        article_seed_markdown = str(proposed_payload or "").strip() or f"# {seed_name}\n\nPerfil con contenido de artículo pendiente."
 
     source = _normalize_proposal_source(proposal_source)
     is_theory = source == PROPOSAL_SOURCE_THEORY
@@ -1599,7 +1599,7 @@ def _materialize_missing_profile_for_proposal(
             {"name": seed_name, "person_id": resolved_person_id},
         )
 
-        title_label = seed_title or "Unassigned"
+        title_label = seed_title or "Sin asignar"
         if is_theory:
             title_id = ensure_theory_title(session, title_label)
         else:
@@ -2027,33 +2027,33 @@ def _build_source_push_review_markdown(
 ) -> tuple[str, str]:
     safe_file_name = (file_name or "").strip() or f"file-{max(0, int(unsorted_file_id or 0))}"
     safe_source_slug = (source_slug or "").strip().lower()
-    safe_source_name = (source_name or "").strip() or safe_source_slug or "source"
-    safe_origin = (origin_text or "").strip() or "n/a"
-    safe_mime = (mime_type or "").strip() or "unknown"
+    safe_source_name = (source_name or "").strip() or safe_source_slug or "fuente"
+    safe_origin = (origin_text or "").strip() or "n/d"
+    safe_mime = (mime_type or "").strip() or "desconocido"
     safe_size = max(0, int(size_bytes or 0))
     safe_note = (note or "").strip()
     safe_media_url = (media_url or "").strip()
 
     current_lines = [
-        "## Current state",
-        f"- Unsorted file `#{max(0, int(unsorted_file_id or 0))}` is pending routing.",
-        f"- File: `{safe_file_name}`",
-        f"- Current location: `unsorted`",
+        "## Estado actual",
+        f"- El archivo sin clasificar `#{max(0, int(unsorted_file_id or 0))}` está pendiente de enrutamiento.",
+        f"- Archivo: `{safe_file_name}`",
+        "- Ubicación actual: `sin-clasificar`",
     ]
 
     proposed_lines = [
-        "## Proposed state",
-        f"- Push unsorted file `#{max(0, int(unsorted_file_id or 0))}` to source `{safe_source_slug or 'unknown'}`.",
-        f"- Source name: `{safe_source_name}`",
-        f"- File: `{safe_file_name}`",
-        f"- Mime type: `{safe_mime}`",
-        f"- File size (bytes): `{safe_size}`",
-        f"- Origin/description: {safe_origin}",
+        "## Estado propuesto",
+        f"- Mover archivo sin clasificar `#{max(0, int(unsorted_file_id or 0))}` a la fuente `{safe_source_slug or 'desconocida'}`.",
+        f"- Nombre de la fuente: `{safe_source_name}`",
+        f"- Archivo: `{safe_file_name}`",
+        f"- Tipo MIME: `{safe_mime}`",
+        f"- Tamaño del archivo (bytes): `{safe_size}`",
+        f"- Origen/descripción: {safe_origin}",
     ]
     if safe_note:
-        proposed_lines.append(f"- User note: {safe_note}")
+        proposed_lines.append(f"- Nota del usuario: {safe_note}")
     if safe_media_url:
-        proposed_lines.append(f"- File URL: {safe_media_url}")
+        proposed_lines.append(f"- URL del archivo: {safe_media_url}")
 
     return ("\n".join(current_lines), "\n".join(proposed_lines))
 
@@ -2068,7 +2068,7 @@ def _format_tags_markdown(tags: Sequence[str]) -> str:
         seen.add(normalized)
         cleaned.append(normalized)
     if not cleaned:
-        return "(none)"
+        return "(ninguna)"
     return ", ".join(f"`{tag}`" for tag in cleaned)
 
 
@@ -2085,8 +2085,8 @@ def _build_source_tags_review_markdown(
     media_url: str,
 ) -> tuple[str, str]:
     safe_file_name = (file_name or "").strip() or f"file-{max(0, int(unsorted_file_id or 0))}"
-    safe_origin = (origin_text or "").strip() or "n/a"
-    safe_mime = (mime_type or "").strip() or "unknown"
+    safe_origin = (origin_text or "").strip() or "n/d"
+    safe_mime = (mime_type or "").strip() or "desconocido"
     safe_size = max(0, int(size_bytes or 0))
     safe_note = (note or "").strip()
     safe_media_url = (media_url or "").strip()
@@ -2094,25 +2094,25 @@ def _build_source_tags_review_markdown(
     proposed_tags_md = _format_tags_markdown(proposed_tags)
 
     current_lines = [
-        "## Current state",
-        f"- Unsorted file `#{max(0, int(unsorted_file_id or 0))}` tag proposal state.",
-        f"- File: `{safe_file_name}`",
-        f"- Mime type: `{safe_mime}`",
-        f"- File size (bytes): `{safe_size}`",
-        f"- Origin/description: {safe_origin}",
-        f"- Current accepted tags: {current_tags_md}",
+        "## Estado actual",
+        f"- Estado de propuesta de etiquetas para archivo sin clasificar `#{max(0, int(unsorted_file_id or 0))}`.",
+        f"- Archivo: `{safe_file_name}`",
+        f"- Tipo MIME: `{safe_mime}`",
+        f"- Tamaño del archivo (bytes): `{safe_size}`",
+        f"- Origen/descripción: {safe_origin}",
+        f"- Etiquetas aceptadas actuales: {current_tags_md}",
     ]
 
     proposed_lines = [
-        "## Proposed state",
-        f"- Update tags for unsorted file `#{max(0, int(unsorted_file_id or 0))}`.",
-        f"- File: `{safe_file_name}`",
-        f"- Proposed tags: {proposed_tags_md}",
+        "## Estado propuesto",
+        f"- Actualizar etiquetas para el archivo sin clasificar `#{max(0, int(unsorted_file_id or 0))}`.",
+        f"- Archivo: `{safe_file_name}`",
+        f"- Etiquetas propuestas: {proposed_tags_md}",
     ]
     if safe_note:
-        proposed_lines.append(f"- User note: {safe_note}")
+        proposed_lines.append(f"- Nota del usuario: {safe_note}")
     if safe_media_url:
-        proposed_lines.append(f"- File URL: {safe_media_url}")
+        proposed_lines.append(f"- URL del archivo: {safe_media_url}")
 
     return ("\n".join(current_lines), "\n".join(proposed_lines))
 
@@ -2391,7 +2391,7 @@ def _fetch_people_proposal_by_id(proposal_id: int) -> Dict[str, object] | None:
                         c.slug AS current_person_slug,
                         COALESCE(c.person_id, 0) AS current_person_id,
                         COALESCE(person.name, '') AS current_name,
-                        COALESCE(title.label, 'Unassigned') AS current_title,
+                        COALESCE(title.label, 'Sin asignar') AS current_title,
                         COALESCE(c.bucket, '') AS current_bucket,
                         COALESCE(c.image_url, '') AS current_image_url,
                         COALESCE(article.markdown, '') AS current_markdown,
@@ -2503,7 +2503,7 @@ def _fetch_people_proposal_by_id(proposal_id: int) -> Dict[str, object] | None:
                             c.slug AS current_person_slug,
                             COALESCE(c.person_id, 0) AS current_person_id,
                             COALESCE(person.name, '') AS current_name,
-                            COALESCE(title.label, 'Unassigned') AS current_title,
+                            COALESCE(title.label, 'Sin asignar') AS current_title,
                             COALESCE(c.bucket, '') AS current_bucket,
                             COALESCE(c.image_url, '') AS current_image_url,
                             COALESCE(article.markdown, '') AS current_markdown,
@@ -2627,7 +2627,7 @@ def _fetch_theory_proposal_by_id(proposal_id: int) -> Dict[str, object] | None:
                         c.slug AS current_person_slug,
                         COALESCE(c.person_id, 0) AS current_person_id,
                         COALESCE(person.name, '') AS current_name,
-                        COALESCE(title.label, 'Unassigned') AS current_title,
+                        COALESCE(title.label, 'Sin asignar') AS current_title,
                         COALESCE(c.bucket, '') AS current_bucket,
                         COALESCE(c.image_url, '') AS current_image_url,
                         COALESCE(article.markdown, '') AS current_markdown,
@@ -2739,7 +2739,7 @@ def _fetch_theory_proposal_by_id(proposal_id: int) -> Dict[str, object] | None:
                             c.slug AS current_person_slug,
                             COALESCE(c.person_id, 0) AS current_person_id,
                             COALESCE(person.name, '') AS current_name,
-                            COALESCE(title.label, 'Unassigned') AS current_title,
+                            COALESCE(title.label, 'Sin asignar') AS current_title,
                             COALESCE(c.bucket, '') AS current_bucket,
                             COALESCE(c.image_url, '') AS current_image_url,
                             COALESCE(article.markdown, '') AS current_markdown,
@@ -3053,7 +3053,7 @@ def _fetch_source_proposal_by_id(
     proposal["current_person_slug"] = ""
     proposal["current_person_id"] = 0
     proposal["current_name"] = source_name
-    proposal["current_title"] = "Source"
+    proposal["current_title"] = "Fuente"
     proposal["current_bucket"] = ""
     proposal["current_image_url"] = preview_image_url
     proposal["current_markdown"] = base_markdown
@@ -3077,7 +3077,7 @@ def _accept_source_push_proposal(
     if proposal_id <= 0:
         raise ValueError("Proposal id is missing.")
     if unsorted_file_id <= 0:
-        raise ValueError("Unsorted file id is missing from proposal.")
+        raise ValueError("Falta el ID del archivo sin clasificar en la propuesta.")
     if source_id <= 0 and not source_slug:
         raise ValueError("Target source is missing from proposal.")
 
@@ -3206,7 +3206,7 @@ def _accept_source_tags_proposal(
     if proposal_id <= 0:
         raise ValueError("Proposal id is missing.")
     if file_id <= 0:
-        raise ValueError("Unsorted file id is missing from proposal.")
+        raise ValueError("Falta el ID del archivo sin clasificar en la propuesta.")
 
     session.execute(
         text(
@@ -3222,7 +3222,7 @@ def _accept_source_tags_proposal(
         {
             "proposal_id": proposal_id,
             "reviewer_user_id": int(reviewer_user_id),
-            "review_note": "Accepted by reviewer from The List review panel",
+            "review_note": "Aceptado por revisor desde el panel de revisión",
         },
     )
     return slug_hint or f"unsorted-file-{file_id}"
@@ -3309,15 +3309,15 @@ def _extract_upload_path(uploaded_image: object) -> str:
 def _persist_uploaded_image(upload_path: str, slug: str, actor_email: str) -> str:
     source = Path((upload_path or "").strip())
     if not source.is_file():
-        raise ValueError("Uploaded image could not be read.")
+        raise ValueError("No se pudo leer la imagen subida.")
 
     extension = source.suffix.lower()
     if extension not in ALLOWED_IMAGE_EXTENSIONS:
         allowed = ", ".join(sorted(ALLOWED_IMAGE_EXTENSIONS))
-        raise ValueError(f"Unsupported image format. Allowed: {allowed}")
+        raise ValueError(f"Formato de imagen no compatible. Permitidos: {allowed}")
     image_bytes = source.read_bytes()
     if len(image_bytes) > MAX_IMAGE_BYTES:
-        raise ValueError(f"Image exceeds {MAX_IMAGE_BYTES // (1024 * 1024)} MB limit.")
+        raise ValueError(f"La imagen supera el límite de {MAX_IMAGE_BYTES // (1024 * 1024)} MB.")
 
     email_slug = _slugify((actor_email or "anon").split("@", 1)[0])
     filename = f"{email_slug}-{uuid4().hex[:10]}{extension}"
@@ -3435,7 +3435,7 @@ def _resolve_user_email_by_id(user_id: int) -> str:
 
 def _render_tag_chips(tags: Sequence[str]) -> str:
     if not tags:
-        return '<span class="person-tag person-tag--muted">no-tags</span>'
+        return '<span class="person-tag person-tag--muted">sin-etiquetas</span>'
     parts = []
     for tag in tags:
         safe_tag = html.escape(tag)
@@ -3445,13 +3445,13 @@ def _render_tag_chips(tags: Sequence[str]) -> str:
 
 def _render_cards(people: Sequence[Dict[str, object]]) -> str:
     if not people:
-        return '<div class="people-empty">No profiles are available.</div>'
+        return '<div class="people-empty">No hay perfiles disponibles.</div>'
 
     cards: List[str] = []
     for row in people:
-        name = html.escape(str(row.get("name") or "Unknown"))
+        name = html.escape(str(row.get("name") or "Desconocido"))
         slug = str(row.get("slug") or "")
-        title = html.escape(str(row.get("title") or row.get("bucket") or "Unassigned"))
+        title = html.escape(str(row.get("title") or row.get("bucket") or "Sin asignar"))
         image_url = html.escape(str(row.get("image_url") or "/images/Logo.png"), quote=True)
         href = f"/receta/?slug={quote(slug, safe='-')}"
         tag_values = [_normalize_tag(str(tag)) for tag in row.get("tags", []) if str(tag).strip()]
@@ -3476,13 +3476,13 @@ def _render_cards(people: Sequence[Dict[str, object]]) -> str:
 
 
 def _render_person_hero(person: Dict[str, object], *, include_back_link: bool = True) -> str:
-    name = html.escape(str(person.get("name") or "Unknown"))
-    title = html.escape(str(person.get("title") or person.get("bucket") or "Unassigned"))
+    name = html.escape(str(person.get("name") or "Desconocido"))
+    title = html.escape(str(person.get("title") or person.get("bucket") or "Sin asignar"))
     image_url = html.escape(str(person.get("image_url") or "/images/Logo.png"), quote=True)
     tags_markup = _render_tag_chips(person.get("tags", []))
     back_link_markup = (
         '<div class="person-detail-card__top-row">'
-        '<a class="person-detail-card__back-link" href="/recetas/">Back to all cards</a>'
+        '<a class="person-detail-card__back-link" href="/recetas/">Volver a todas las tarjetas</a>'
         "</div>"
         if include_back_link
         else ""
@@ -3514,9 +3514,9 @@ def _render_card_article_preview(title: str, card_snapshot: Dict[str, object], a
     tags = [str(tag).strip() for tag in tags_source if str(tag).strip()]
     hero_html = _render_person_hero(
         {
-            "name": str(card_snapshot.get("name") or "").strip() or "Unknown",
-            "title": str(card_snapshot.get("title") or card_snapshot.get("bucket") or "").strip() or "Unassigned",
-            "bucket": str(card_snapshot.get("title") or card_snapshot.get("bucket") or "").strip() or "Unassigned",
+            "name": str(card_snapshot.get("name") or "").strip() or "Desconocido",
+            "title": str(card_snapshot.get("title") or card_snapshot.get("bucket") or "").strip() or "Sin asignar",
+            "bucket": str(card_snapshot.get("title") or card_snapshot.get("bucket") or "").strip() or "Sin asignar",
             "image_url": str(card_snapshot.get("image_url") or "").strip() or "/images/Logo.png",
             "tags": tags,
         },
@@ -3529,7 +3529,7 @@ def _render_card_article_preview(title: str, card_snapshot: Dict[str, object], a
     )
     article_section = _render_citation_compiled_markdown(str(article_markdown or ""))
     if not str(article_section or "").strip():
-        article_section = "_No article content._"
+        article_section = "_Sin contenido de artículo._"
 
     # Keep article markdown outside HTML containers so Gradio compiles it normally.
     return (
@@ -3593,7 +3593,7 @@ def _render_inline_markdown_html(raw_text: str) -> str:
 def _render_article_markdown_html(markdown_text: str) -> str:
     normalized_lines = str(markdown_text or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")
     if not any(str(line or "").strip() for line in normalized_lines):
-        return "<p class='proposal-card-article__empty'><em>No article content.</em></p>"
+        return "<p class='proposal-card-article__empty'><em>Sin contenido de artículo.</em></p>"
 
     rendered: List[str] = []
     paragraph_lines: List[str] = []
@@ -3666,7 +3666,7 @@ def _render_article_markdown_html(markdown_text: str) -> str:
         if image_match:
             _flush_paragraph()
             _flush_list()
-            alt = html.escape(str(image_match.group(1) or "").strip() or "Article image", quote=True)
+            alt = html.escape(str(image_match.group(1) or "").strip() or "Imagen del artículo", quote=True)
             src = _sanitize_markdown_image_src(image_match.group(2))
             if src:
                 rendered.append(f"<p><img src='{src}' alt='{alt}' loading='lazy' /></p>")
@@ -3707,7 +3707,7 @@ def _render_article_markdown_html(markdown_text: str) -> str:
     _flush_code_block()
 
     if not rendered:
-        return "<p class='proposal-card-article__empty'><em>No article content.</em></p>"
+        return "<p class='proposal-card-article__empty'><em>Sin contenido de artículo.</em></p>"
     return "\n".join(rendered)
 
 
@@ -3718,9 +3718,9 @@ def _render_card_article_snapshot_html(title: str, card_snapshot: Dict[str, obje
     tags = [str(tag).strip() for tag in tags_source if str(tag).strip()]
     hero_html = _render_person_hero(
         {
-            "name": str(card_snapshot.get("name") or "").strip() or "Unknown",
-            "title": str(card_snapshot.get("title") or card_snapshot.get("bucket") or "").strip() or "Unassigned",
-            "bucket": str(card_snapshot.get("title") or card_snapshot.get("bucket") or "").strip() or "Unassigned",
+            "name": str(card_snapshot.get("name") or "").strip() or "Desconocido",
+            "title": str(card_snapshot.get("title") or card_snapshot.get("bucket") or "").strip() or "Sin asignar",
+            "bucket": str(card_snapshot.get("title") or card_snapshot.get("bucket") or "").strip() or "Sin asignar",
             "image_url": str(card_snapshot.get("image_url") or "").strip() or "/images/Logo.png",
             "tags": tags,
         },
@@ -3744,13 +3744,13 @@ def _render_card_article_snapshot_html(title: str, card_snapshot: Dict[str, obje
 
 
 def _render_missing_person(slug: str) -> str:
-    safe_slug = html.escape(slug or "unknown")
+    safe_slug = html.escape(slug or "desconocido")
     return (
         "<section class='person-detail-card person-detail-card--missing'>"
         "<div class='person-detail-card__body'>"
-        "<a class='person-detail-card__back-link' href='/recetas/'>Back to all cards</a>"
-        "<h2>Profile not found</h2>"
-        f"<p>No player matched slug <code>{safe_slug}</code>.</p>"
+        "<a class='person-detail-card__back-link' href='/recetas/'>Volver a todas las tarjetas</a>"
+        "<h2>Perfil no encontrado</h2>"
+        f"<p>No se encontró ningún perfil con slug <code>{safe_slug}</code>.</p>"
         "</div></section>"
     )
 
@@ -3762,12 +3762,12 @@ def _render_empty_diff(message: str) -> str:
 def _scope_dataset_title(scope: str) -> str:
     normalized_scope = _normalize_proposal_scope(scope)
     if normalized_scope == PROPOSAL_SCOPE_SOURCE:
-        return "Source"
+        return "Fuente"
     if normalized_scope == PROPOSAL_SCOPE_CARD:
-        return "Card"
+        return "Tarjeta"
     if normalized_scope == PROPOSAL_SCOPE_CARD_ARTICLE:
-        return "Card + Article"
-    return "Article"
+        return "Tarjeta + Artículo"
+    return "Artículo"
 
 
 def _scope_dataset_prefix(scope: str) -> str:
@@ -3869,17 +3869,17 @@ def _format_elapsed_ago(value: object) -> str:
 
     now_utc = datetime.now(timezone.utc)
     if parsed_time > now_utc:
-        return "just now"
+        return "justo ahora"
 
     elapsed_seconds = int((now_utc - parsed_time).total_seconds())
     if elapsed_seconds < 60:
-        return "just now"
+        return "justo ahora"
     if elapsed_seconds < 3600:
         minutes = max(1, elapsed_seconds // 60)
-        return f"{_pluralize_unit(minutes, 'minute')} ago"
+        return f"hace {_pluralize_unit(minutes, 'minuto')}"
     if elapsed_seconds < 86400:
         hours = max(1, elapsed_seconds // 3600)
-        return f"{_pluralize_unit(hours, 'hour')} ago"
+        return f"hace {_pluralize_unit(hours, 'hora')}"
 
     total_months = max(0, (now_utc.year - parsed_time.year) * 12 + (now_utc.month - parsed_time.month))
     shifted_time = _add_months(parsed_time, total_months)
@@ -3891,17 +3891,17 @@ def _format_elapsed_ago(value: object) -> str:
     years, months = divmod(total_months, 12)
     parts: List[str] = []
     if years > 0:
-        parts.append(_pluralize_unit(years, "year"))
+        parts.append(_pluralize_unit(years, "año"))
     if months > 0:
-        parts.append(_pluralize_unit(months, "month"))
+        parts.append(_pluralize_unit(months, "mes"))
     if remaining_days > 0 and len(parts) < 2:
-        parts.append(_pluralize_unit(remaining_days, "day"))
+        parts.append(_pluralize_unit(remaining_days, "día"))
     if not parts:
         day_count = max(1, elapsed_seconds // 86400)
-        parts.append(_pluralize_unit(day_count, "day"))
+        parts.append(_pluralize_unit(day_count, "día"))
     if len(parts) == 1:
-        return f"{parts[0]} ago"
-    return f"{parts[0]} and {parts[1]} ago"
+        return f"hace {parts[0]}"
+    return f"hace {parts[0]} y {parts[1]}"
 
 
 def _format_username_with_email(name_value: object, email_value: object, user_id: int) -> str:
@@ -3914,9 +3914,9 @@ def _format_username_with_email(name_value: object, email_value: object, user_id
     elif name:
         username = name
     elif user_id > 0:
-        username = f"user#{user_id}"
+        username = f"usuario#{user_id}"
     else:
-        username = "unknown"
+        username = "desconocido"
     if email:
         return f"{username} ({email})"
     return username
@@ -3942,63 +3942,63 @@ def _render_proposal_meta(
         proposal.get("proposer_email"),
         proposer_user_id,
     )
-    heading = f"### {scope_title} proposal"
+    heading = f"### Propuesta de {scope_title}"
     if proposal_source == PROPOSAL_SOURCE_SOURCE:
         if source_proposal_type == SOURCE_PROPOSAL_TYPE_TAGS:
-            heading = "### Source tags proposal"
+            heading = "### Propuesta de etiquetas de fuente"
         else:
-            heading = "### Source push proposal"
-    created_raw = str(proposal.get("created_at") or "").strip() or "n/a"
+            heading = "### Propuesta de envío a fuente"
+    created_raw = str(proposal.get("created_at") or "").strip() or "n/d"
     created_ago = _format_elapsed_ago(proposal.get("created_at"))
-    created_line = f"`{created_raw}`" if created_raw else "`n/a`"
+    created_line = f"`{created_raw}`" if created_raw else "`n/d`"
     if created_ago:
         created_line = f"{created_line} ({created_ago})"
     slug_value = str(proposal.get("person_slug") or "").strip()
-    slug_label = "Profile"
+    slug_label = "Perfil"
     if proposal_source == PROPOSAL_SOURCE_SOURCE:
-        slug_label = "Target source"
+        slug_label = "Fuente de destino"
     lines = [
         heading,
-        f"- **Source:** `{source_label}`",
+        f"- **Origen:** `{source_label}`",
         f"- **{slug_label}:** `{slug_value}`",
-        f"- **Proposer:** `{proposer_identity}`",
-        f"- **Created:** {created_line}",
+        f"- **Proponente:** `{proposer_identity}`",
+        f"- **Creada:** {created_line}",
     ]
     if proposal_source == PROPOSAL_SOURCE_SOURCE:
         file_id = int(proposal.get("unsorted_file_id") or 0)
-        file_name = str(proposal.get("unsorted_file_name") or "").strip() or "file"
+        file_name = str(proposal.get("unsorted_file_name") or "").strip() or "archivo"
         source_name = str(proposal.get("source_name") or "").strip()
         if file_id > 0:
-            lines.append(f"- **Unsorted file id:** `{file_id}`")
-        lines.append(f"- **Unsorted file name:** `{file_name}`")
+            lines.append(f"- **ID de archivo sin clasificar:** `{file_id}`")
+        lines.append(f"- **Nombre de archivo sin clasificar:** `{file_name}`")
         if source_proposal_type == SOURCE_PROPOSAL_TYPE_TAGS:
             current_tags = _format_tags_markdown(_decode_tags(proposal.get("current_tags_json")))
             proposed_tags = _format_tags_markdown(_decode_tags(proposal.get("proposed_tags_json")))
-            lines.append(f"- **Current accepted tags:** {current_tags}")
-            lines.append(f"- **Proposed tags:** {proposed_tags}")
+            lines.append(f"- **Etiquetas aceptadas actuales:** {current_tags}")
+            lines.append(f"- **Etiquetas propuestas:** {proposed_tags}")
         else:
             if source_name:
-                lines.append(f"- **Target source name:** `{source_name}`")
+                lines.append(f"- **Nombre de fuente de destino:** `{source_name}`")
         origin_text = str(proposal.get("unsorted_origin_text") or "").strip()
         if origin_text:
-            lines.append(f"- **Origin/description:** {origin_text}")
+            lines.append(f"- **Origen/descripción:** {origin_text}")
 
     note = (proposal.get("note") or "").strip()
     if note:
-        lines.append(f"- **User note:** {note}")
+        lines.append(f"- **Nota del usuario:** {note}")
 
     reviewer_user_id = int(proposal.get("reviewer_user_id") or 0)
     reviewer_email = str(proposal.get("reviewer_email") or "").strip()
     reviewer_name = str(proposal.get("reviewer_name") or "").strip()
-    reviewer_identity = reviewer_email or reviewer_name or (f"user#{reviewer_user_id}" if reviewer_user_id > 0 else "")
+    reviewer_identity = reviewer_email or reviewer_name or (f"usuario#{reviewer_user_id}" if reviewer_user_id > 0 else "")
     reviewed_at = str(proposal.get("reviewed_at") or "").strip()
     review_note = str(proposal.get("review_note") or "").strip()
     if reviewer_user_id > 0 or reviewer_identity or reviewed_at or review_note:
-        lines.append(f"- **Reviewed by user id:** `{reviewer_user_id if reviewer_user_id > 0 else 'unknown'}`")
-        lines.append(f"- **Reviewed by:** `{reviewer_identity or 'unknown'}`")
-        lines.append(f"- **Reviewed at:** `{reviewed_at or 'n/a'}`")
+        lines.append(f"- **Revisada por ID de usuario:** `{reviewer_user_id if reviewer_user_id > 0 else 'desconocido'}`")
+        lines.append(f"- **Revisada por:** `{reviewer_identity or 'desconocido'}`")
+        lines.append(f"- **Revisada en:** `{reviewed_at or 'n/d'}`")
         if review_note:
-            lines.append(f"- **Review note:** {review_note}")
+            lines.append(f"- **Nota de revisión:** {review_note}")
 
     return "\n".join(lines)
 
@@ -4018,7 +4018,7 @@ def _render_proposal_images(base_image_url: str, current_image_url: str, propose
         "<div class='the-list-review-image-frame' "
         "style='width:100%;aspect-ratio:4 / 3;border:1px solid #d9e4f4;border-radius:12px;"
         "background:linear-gradient(140deg,#edf3ff 0%,#ecfeff 100%);overflow:hidden;'>"
-        f"<img src='{review_image}' alt='Image under review' loading='lazy' "
+        f"<img src='{review_image}' alt='Imagen en revisión' loading='lazy' "
         "style='display:block;width:100%;height:100%;margin:0;padding:0;border:0;object-fit:cover;' />"
         "</div>"
         "</div>"
@@ -4026,15 +4026,15 @@ def _render_proposal_images(base_image_url: str, current_image_url: str, propose
 
 
 def _render_card_snapshot_markdown(snapshot: Dict[str, object]) -> str:
-    name = html.escape(str(snapshot.get("name") or "Unknown"))
-    title = html.escape(str(snapshot.get("title") or snapshot.get("bucket") or "Unassigned"))
+    name = html.escape(str(snapshot.get("name") or "Desconocido"))
+    title = html.escape(str(snapshot.get("title") or snapshot.get("bucket") or "Sin asignar"))
     tags = [str(tag).strip() for tag in snapshot.get("tags", []) if str(tag).strip()]
-    tags_md = ", ".join(f"`{html.escape(tag)}`" for tag in tags) if tags else "_No tags_"
+    tags_md = ", ".join(f"`{html.escape(tag)}`" for tag in tags) if tags else "_Sin etiquetas_"
     return (
-        "## Card Snapshot\n"
-        f"- **Name:** {name}\n"
-        f"- **Title:** {title}\n"
-        f"- **Tags:** {tags_md}\n"
+        "## Instantánea de la tarjeta\n"
+        f"- **Nombre:** {name}\n"
+        f"- **Título:** {title}\n"
+        f"- **Etiquetas:** {tags_md}\n"
     )
 
 
@@ -4053,7 +4053,7 @@ def _render_card_review_state_panel(
     def _value_line(value: object, highlight_variant: str = "") -> str:
         text = str(value or "").strip()
         if not text:
-            rendered = "<span class='card-review-empty'>(empty)</span>"
+            rendered = "<span class='card-review-empty'>(vacío)</span>"
         else:
             rendered = html.escape(text)
         if highlight_variant:
@@ -4138,12 +4138,12 @@ def _render_card_review_state_panel(
         image_wrap_classes.append(f"card-review-image-wrap--{normalized_side}")
 
     card_markdown = (
-        f"**Name:** {_value_line(name_value, highlight_variant=name_variant)}\n\n"
+        f"**Nombre:** {_value_line(name_value, highlight_variant=name_variant)}\n\n"
         f"<div class='{' '.join(image_wrap_classes)}'>"
-        f"<img class='card-review-image' src='{safe_image_url}' alt='Card image' loading='lazy' />"
+        f"<img class='card-review-image' src='{safe_image_url}' alt='Imagen de la tarjeta' loading='lazy' />"
         "</div>\n\n"
-        f"**Title:** {_value_line(title_value, highlight_variant=title_variant)}\n\n"
-        "**Tags:**\n"
+        f"**Título:** {_value_line(title_value, highlight_variant=title_variant)}\n\n"
+        "**Etiquetas:**\n"
         f"{tags_list}"
     )
     return _render_review_markdown_panel(panel_title, card_markdown)
@@ -4152,19 +4152,19 @@ def _render_card_review_state_panel(
 def _render_review_markdown_panel(title: str, markdown_text: str) -> str:
     cleaned_markdown = (markdown_text or "").strip()
     if not cleaned_markdown:
-        cleaned_markdown = "_No markdown content._"
+        cleaned_markdown = "_Sin contenido markdown._"
     return f"### {title}\n\n{cleaned_markdown}"
 
 
 def _normalize_review_view_mode(view_mode: str) -> str:
     normalized_mode = str(view_mode or DEFAULT_REVIEW_VIEW).strip().lower()
-    if normalized_mode in {REVIEW_VIEW_RAW, MARKDOWN_VIEW_RAW, "raw markdown"}:
+    if normalized_mode in {REVIEW_VIEW_RAW, MARKDOWN_VIEW_RAW, "markdown en bruto"}:
         return REVIEW_VIEW_RAW
     return REVIEW_VIEW_COMPILED
 
 
 def _review_raw_panel_title(title: str) -> str:
-    return re.sub(r"\(compiled\)", "(raw markdown)", str(title or ""), flags=re.IGNORECASE)
+    return re.sub(r"\(compiled\)", "(markdown en bruto)", str(title or ""), flags=re.IGNORECASE)
 
 
 def _render_review_article_raw_panel(title: str, markdown_text: str) -> str:
@@ -4172,7 +4172,7 @@ def _render_review_article_raw_panel(title: str, markdown_text: str) -> str:
     if raw_lines:
         body_lines = [f"<span class='review-raw-line'>{html.escape(line)}</span>" for line in raw_lines]
     else:
-        body_lines = ["<span class='review-raw-line review-raw-line--empty'>(empty)</span>"]
+        body_lines = ["<span class='review-raw-line review-raw-line--empty'>(vacío)</span>"]
     body_markup = (
         "<div class='review-raw-markdown'>"
         "<pre class='review-raw-markdown__pre'>"
@@ -4215,7 +4215,7 @@ def _render_review_article_raw_diff_panel(
         # For deletes there is no line in the target view; keep panel text exactly as target.
 
     if not diff_lines:
-        diff_lines.append("<span class='review-raw-line review-raw-line--empty'>(empty)</span>")
+        diff_lines.append("<span class='review-raw-line review-raw-line--empty'>(vacío)</span>")
 
     body_markup = (
         "<div class='review-raw-markdown'>"
@@ -4542,7 +4542,7 @@ def _render_grouped_current_proposed_panels(
 ) -> tuple[str, str, str, List[Dict[str, int]], bool]:
     normalized_scope = _normalize_proposal_scope(scope)
     collapse_base_current = str(base_raw or "") == str(current_raw or "")
-    base_title = "Base state (=Current state) (compiled)" if collapse_base_current else "Base state (compiled)"
+    base_title = "Estado base (=estado actual) (compilado)" if collapse_base_current else "Estado base (compilado)"
     if normalized_scope == PROPOSAL_SCOPE_CARD:
         base_snapshot = _deserialize_card_snapshot(base_raw)
         current_snapshot = _deserialize_card_snapshot(current_raw, fallback=base_snapshot)
@@ -4552,14 +4552,14 @@ def _render_grouped_current_proposed_panels(
         proposed_image = proposed_image_url or current_image
         return (
             _render_card_review_state_panel(
-                "Base card",
+                "Tarjeta base",
                 base_snapshot,
                 base_image,
                 side="base",
                 context_snapshot=proposed_snapshot,
             ),
             _render_card_review_state_panel(
-                "Current card",
+                "Tarjeta actual",
                 current_snapshot,
                 current_image,
                 side="current",
@@ -4568,7 +4568,7 @@ def _render_grouped_current_proposed_panels(
                 context_snapshot=proposed_snapshot,
             ),
             _render_card_review_state_panel(
-                "Proposed card",
+                "Tarjeta propuesta",
                 proposed_snapshot,
                 proposed_image,
                 side="proposed",
@@ -4603,9 +4603,9 @@ def _render_grouped_current_proposed_panels(
             current_raw=current_raw,
         )
         return (
-            "" if hide_base_current else _render_card_article_preview("Base (card + article)", base_card, base_article),
-            "" if hide_base_current else _render_card_article_preview("Current (card + article)", current_card, current_article),
-            _render_card_article_preview("Proposed (card + article)", proposed_card, proposed_article),
+            "" if hide_base_current else _render_card_article_preview("Base (tarjeta + artículo)", base_card, base_article),
+            "" if hide_base_current else _render_card_article_preview("Actual (tarjeta + artículo)", current_card, current_article),
+            _render_card_article_preview("Propuesto (tarjeta + artículo)", proposed_card, proposed_article),
             [],
             collapse_base_current,
         )
@@ -4897,8 +4897,8 @@ def _render_grouped_current_proposed_panels(
     proposed_output = _render_side_output("proposed", proposed_lines, highlighted_proposed_lines)
     return (
         _render_review_article_compiled_panel(base_title, "\n".join(base_output)),
-        _render_review_article_compiled_panel("Current state (compiled)", "\n".join(current_output)),
-        _render_review_article_compiled_panel("Proposed state (compiled)", "\n".join(proposed_output)),
+        _render_review_article_compiled_panel("Estado actual (compilado)", "\n".join(current_output)),
+        _render_review_article_compiled_panel("Estado propuesto (compilado)", "\n".join(proposed_output)),
         change_groups,
         collapse_base_current,
     )
@@ -5003,7 +5003,7 @@ def _build_admin_display_panel_updates(
         )
 
     if normalized_scope == PROPOSAL_SCOPE_CARD_ARTICLE:
-        base_title = "Base state (=Current state) (compiled)" if collapse_base_current else "Base state (compiled)"
+        base_title = "Estado base (=estado actual) (compilado)" if collapse_base_current else "Estado base (compilado)"
         hide_base_current = _should_hide_card_article_base_current_panels(
             proposal=None,
             base_raw=raw_base,
@@ -5016,11 +5016,11 @@ def _build_admin_display_panel_updates(
             ""
             if hide_base_current
             else _render_review_article_raw_panel(
-                "Current state (compiled)",
+                "Estado actual (compilado)",
                 _format_card_article_raw_payload_for_display(raw_current),
             ),
             _render_review_article_raw_panel(
-                "Proposed state (compiled)",
+                "Estado propuesto (compilado)",
                 _format_card_article_raw_payload_for_display(raw_proposed),
             ),
             collapse_base_current=collapse_base_current,
@@ -5035,11 +5035,11 @@ def _build_admin_display_panel_updates(
             scope=normalized_scope,
         )
 
-    base_title = "Base state (=Current state) (compiled)" if collapse_base_current else "Base state (compiled)"
+    base_title = "Estado base (=estado actual) (compilado)" if collapse_base_current else "Estado base (compilado)"
     return _build_article_compiled_panel_updates(
         _render_review_article_raw_panel(base_title, raw_base),
-        _render_review_article_raw_diff_panel("Current state (compiled)", raw_base, raw_current, "current"),
-        _render_review_article_raw_diff_panel("Proposed state (compiled)", raw_base, raw_proposed, "proposed"),
+        _render_review_article_raw_diff_panel("Estado actual (compilado)", raw_base, raw_current, "current"),
+        _render_review_article_raw_diff_panel("Estado propuesto (compilado)", raw_base, raw_proposed, "proposed"),
         collapse_base_current=collapse_base_current,
     )
 
@@ -5107,9 +5107,9 @@ def _build_selected_proposal_panel_content(
     review_view_mode: str = DEFAULT_REVIEW_VIEW,
 ) -> tuple[str, str, gr.update, gr.update, gr.update, gr.update, gr.update, gr.update, gr.update, str, str]:
     if proposal is None:
-        empty_compiled_base = _render_review_markdown_panel("Base state (compiled)", "")
-        empty_compiled_current = _render_review_markdown_panel("Current state (compiled)", "")
-        empty_compiled_proposed = _render_review_markdown_panel("Proposed state (compiled)", "")
+        empty_compiled_base = _render_review_markdown_panel("Estado base (compilado)", "")
+        empty_compiled_current = _render_review_markdown_panel("Estado actual (compilado)", "")
+        empty_compiled_proposed = _render_review_markdown_panel("Estado propuesto (compilado)", "")
         (
             compiled_base_update,
             compiled_current_update,
@@ -5134,12 +5134,12 @@ def _build_selected_proposal_panel_content(
             "",
             "",
             "",
-            _render_empty_diff("Selected proposal could not be loaded."),
+            _render_empty_diff("No se pudo cargar la propuesta seleccionada."),
             scope=PROPOSAL_SCOPE_ARTICLE,
         )
         return (
-            "Selected proposal could not be loaded.",
-            _render_empty_diff("Selected proposal could not be loaded."),
+            "No se pudo cargar la propuesta seleccionada.",
+            _render_empty_diff("No se pudo cargar la propuesta seleccionada."),
             compiled_base_update,
             compiled_current_update,
             compiled_proposed_update,
@@ -5236,8 +5236,8 @@ def _build_review_states(
             "slug": current_slug,
             "person_id": current_person_id,
             "name": current_name or _display_name_from_slug(current_slug),
-            "title": current_title or current_bucket or "Unassigned",
-            "bucket": current_bucket or current_title or "Unassigned",
+            "title": current_title or current_bucket or "Sin asignar",
+            "bucket": current_bucket or current_title or "Sin asignar",
             "image_url": current_image_url_value,
             "tags": current_tags,
             "markdown": current_markdown_value,
@@ -5607,8 +5607,8 @@ def _render_compiled_review_panels(
         proposed_render = _render_card_snapshot_markdown(proposed_snapshot)
         highlighted_current, highlighted_proposed = _highlight_markdown_pair(base_render, proposed_render)
         return (
-            _render_review_markdown_panel("Current card snapshot (compiled)", highlighted_current),
-            _render_review_markdown_panel("Proposed card snapshot (compiled)", highlighted_proposed),
+            _render_review_markdown_panel("Instantánea actual de la tarjeta (compilado)", highlighted_current),
+            _render_review_markdown_panel("Instantánea propuesta de la tarjeta (compilado)", highlighted_proposed),
         )
 
     if normalized_scope == PROPOSAL_SCOPE_CARD_ARTICLE:
@@ -5620,21 +5620,21 @@ def _render_compiled_review_panels(
         base_article = str(base_combined.get("article") or "")
         proposed_article = str(proposed_combined.get("article") or "")
         return (
-            _render_card_article_preview("Current (card + article)", base_card, base_article),
-            _render_card_article_preview("Proposed (card + article)", proposed_card, proposed_article),
+            _render_card_article_preview("Actual (tarjeta + artículo)", base_card, base_article),
+            _render_card_article_preview("Propuesto (tarjeta + artículo)", proposed_card, proposed_article),
         )
 
     highlighted_current, highlighted_proposed = _highlight_markdown_pair(base_markdown, proposed_markdown)
     return (
-        _render_review_article_compiled_panel("Current article (compiled)", highlighted_current),
-        _render_review_article_compiled_panel("Proposed article (compiled)", highlighted_proposed),
+        _render_review_article_compiled_panel("Artículo actual (compilado)", highlighted_current),
+        _render_review_article_compiled_panel("Artículo propuesto (compilado)", highlighted_proposed),
     )
 
 
 def _render_plain_snapshot_panel(title: str, lines: Sequence[str]) -> str:
     body = "\n".join(lines).strip()
     if not body:
-        body = "(empty)"
+        body = "(vacío)"
     return (
         "<div class='proposal-diff'>"
         f"<h4 class='proposal-diff-title'>{html.escape(title)}</h4>"
@@ -5755,33 +5755,33 @@ def _render_proposal_diff_table(
         proposed_snapshot = _deserialize_card_snapshot(proposed_markdown, fallback=current_snapshot)
         current_tags = [str(tag).strip() for tag in current_snapshot.get("tags", []) if str(tag).strip()]
         proposed_tags = [str(tag).strip() for tag in proposed_snapshot.get("tags", []) if str(tag).strip()]
-        current_image = str(current_image_url or "").strip() or "(none)"
+        current_image = str(current_image_url or "").strip() or "(ninguno)"
         proposed_image = str(proposed_image_url or "").strip() or current_image
         current_lines = [
-            f"Name: {str(current_snapshot.get('name') or '').strip() or '(empty)'}",
-            f"Title: {str(current_snapshot.get('title') or current_snapshot.get('bucket') or '').strip() or '(empty)'}",
-            f"Tags: {', '.join(current_tags) if current_tags else '(none)'}",
-            f"Image URL: {current_image}",
+            f"Nombre: {str(current_snapshot.get('name') or '').strip() or '(vacío)'}",
+            f"Título: {str(current_snapshot.get('title') or current_snapshot.get('bucket') or '').strip() or '(vacío)'}",
+            f"Etiquetas: {', '.join(current_tags) if current_tags else '(ninguna)'}",
+            f"URL de imagen: {current_image}",
         ]
         proposed_lines = [
-            f"Name: {str(proposed_snapshot.get('name') or '').strip() or '(empty)'}",
-            f"Title: {str(proposed_snapshot.get('title') or proposed_snapshot.get('bucket') or '').strip() or '(empty)'}",
-            f"Tags: {', '.join(proposed_tags) if proposed_tags else '(none)'}",
-            f"Image URL: {proposed_image}",
+            f"Nombre: {str(proposed_snapshot.get('name') or '').strip() or '(vacío)'}",
+            f"Título: {str(proposed_snapshot.get('title') or proposed_snapshot.get('bucket') or '').strip() or '(vacío)'}",
+            f"Etiquetas: {', '.join(proposed_tags) if proposed_tags else '(ninguna)'}",
+            f"URL de imagen: {proposed_image}",
         ]
         if render_as_snapshot:
-            return _render_plain_snapshot_panel("Card proposal snapshot", proposed_lines)
+            return _render_plain_snapshot_panel("Instantánea de propuesta de tarjeta", proposed_lines)
         diff_table = difflib.HtmlDiff(tabsize=2, wrapcolumn=92).make_table(
             current_lines,
             proposed_lines,
-            fromdesc="Current card snapshot",
-            todesc="Proposed card snapshot",
+            fromdesc="Instantánea actual de la tarjeta",
+            todesc="Instantánea propuesta de la tarjeta",
             context=False,
             numlines=1,
         )
         return (
             "<div class='proposal-diff'>"
-            "<h4 class='proposal-diff-title'>Card proposal diff</h4>"
+            "<h4 class='proposal-diff-title'>Diff de propuesta de tarjeta</h4>"
             "<div class='proposal-diff-table'>"
             f"{diff_table}"
             "</div>"
@@ -5799,45 +5799,45 @@ def _render_proposal_diff_table(
         
         current_tags = [str(tag).strip() for tag in current_card.get("tags", []) if str(tag).strip()]
         proposed_tags = [str(tag).strip() for tag in proposed_card.get("tags", []) if str(tag).strip()]
-        current_image = str(current_image_url or "").strip() or str(current_card.get("image_url") or "").strip() or "(none)"
+        current_image = str(current_image_url or "").strip() or str(current_card.get("image_url") or "").strip() or "(ninguno)"
         proposed_image = str(proposed_image_url or "").strip() or str(proposed_card.get("image_url") or "").strip() or current_image
         
         if render_as_snapshot:
             # Render as dedicated card+article boxes so both parts match published layout.
-            return _render_card_article_snapshot_html("Card + Article proposal", proposed_card, proposed_article)
+            return _render_card_article_snapshot_html("Propuesta de tarjeta + artículo", proposed_card, proposed_article)
         
         # Build card lines for diff
         current_card_lines = [
-            "=== CARD ===",
-            f"Name: {str(current_card.get('name') or '').strip() or '(empty)'}",
-            f"Title: {str(current_card.get('title') or '').strip() or '(empty)'}",
-            f"Tags: {', '.join(current_tags) if current_tags else '(none)'}",
-            f"Image URL: {current_image}",
+            "=== TARJETA ===",
+            f"Nombre: {str(current_card.get('name') or '').strip() or '(vacío)'}",
+            f"Título: {str(current_card.get('title') or '').strip() or '(vacío)'}",
+            f"Etiquetas: {', '.join(current_tags) if current_tags else '(ninguna)'}",
+            f"URL de imagen: {current_image}",
             "",
-            "=== ARTICLE ===",
+            "=== ARTÍCULO ===",
         ] + current_article.splitlines()
         
         proposed_card_lines = [
-            "=== CARD ===",
-            f"Name: {str(proposed_card.get('name') or '').strip() or '(empty)'}",
-            f"Title: {str(proposed_card.get('title') or '').strip() or '(empty)'}",
-            f"Tags: {', '.join(proposed_tags) if proposed_tags else '(none)'}",
-            f"Image URL: {proposed_image}",
+            "=== TARJETA ===",
+            f"Nombre: {str(proposed_card.get('name') or '').strip() or '(vacío)'}",
+            f"Título: {str(proposed_card.get('title') or '').strip() or '(vacío)'}",
+            f"Etiquetas: {', '.join(proposed_tags) if proposed_tags else '(ninguna)'}",
+            f"URL de imagen: {proposed_image}",
             "",
-            "=== ARTICLE ===",
+            "=== ARTÍCULO ===",
         ] + proposed_article.splitlines()
         
         diff_table = difflib.HtmlDiff(tabsize=2, wrapcolumn=92).make_table(
             current_card_lines,
             proposed_card_lines,
-            fromdesc="Current card + article",
-            todesc="Proposed card + article",
+            fromdesc="Tarjeta + artículo actual",
+            todesc="Tarjeta + artículo propuesto",
             context=True,
             numlines=2,
         )
         return (
             "<div class='proposal-diff'>"
-            "<h4 class='proposal-diff-title'>Card + Article proposal diff</h4>"
+            "<h4 class='proposal-diff-title'>Diff de propuesta de tarjeta + artículo</h4>"
             "<div class='proposal-diff-table'>"
             f"{diff_table}"
             "</div>"
@@ -5847,18 +5847,18 @@ def _render_proposal_diff_table(
     current_value = str(current_markdown or "")
     proposed_value = str(proposed_markdown or "")
     if render_as_snapshot:
-        return _render_plain_snapshot_panel("Raw article markdown", proposed_value.splitlines())
+        return _render_plain_snapshot_panel("Markdown en bruto del artículo", proposed_value.splitlines())
     diff_table = difflib.HtmlDiff(tabsize=2, wrapcolumn=92).make_table(
         current_value.splitlines(),
         proposed_value.splitlines(),
-        fromdesc="Current article markdown",
-        todesc="Proposed article markdown",
+        fromdesc="Markdown actual del artículo",
+        todesc="Markdown propuesto del artículo",
         context=True,
         numlines=2,
     )
     return (
         "<div class='proposal-diff'>"
-        "<h4 class='proposal-diff-title'>Raw article markdown diff</h4>"
+        "<h4 class='proposal-diff-title'>Diff de markdown en bruto del artículo</h4>"
         "<div class='proposal-diff-table'>"
         f"{diff_table}"
         "</div>"
@@ -5885,9 +5885,9 @@ def _build_admin_panel(
             ]
 
     if not proposal_rows:
-        empty_compiled_base = _render_review_markdown_panel("Base state (compiled)", "")
-        empty_compiled_current = _render_review_markdown_panel("Current state (compiled)", "")
-        empty_compiled_proposed = _render_review_markdown_panel("Proposed state (compiled)", "")
+        empty_compiled_base = _render_review_markdown_panel("Estado base (compilado)", "")
+        empty_compiled_current = _render_review_markdown_panel("Estado actual (compilado)", "")
+        empty_compiled_proposed = _render_review_markdown_panel("Estado propuesto (compilado)", "")
         (
             compiled_base_update,
             compiled_current_update,
@@ -5912,13 +5912,13 @@ def _build_admin_panel(
             "",
             "",
             "",
-            _render_empty_diff("No proposal diff to display."),
+            _render_empty_diff("No hay diff de propuesta para mostrar."),
             scope=PROPOSAL_SCOPE_ARTICLE,
         )
         return (
             gr.update(choices=[], value=None),
-            "No tracked proposals yet.",
-            _render_empty_diff("No proposal images to display."),
+            "Aún no hay propuestas en seguimiento.",
+            _render_empty_diff("No hay imágenes de propuesta para mostrar."),
             compiled_base_update,
             compiled_current_update,
             compiled_proposed_update,
@@ -5946,14 +5946,14 @@ def _build_admin_panel(
         )
         if not pid:
             continue
-        status = (proposal.get("status") or "unknown").strip().lower()
+        status = (proposal.get("status") or "desconocido").strip().lower()
         scope = _normalize_proposal_scope(proposal.get("proposal_scope"))
         slug = str(proposal.get("person_slug") or "")
         proposer_user_id = int(proposal.get("proposer_user_id") or 0)
         proposer_identity = (
             str(proposal.get("proposer_email") or "").strip()
             or str(proposal.get("proposer_name") or "").strip()
-            or (f"user#{proposer_user_id}" if proposer_user_id > 0 else "unknown")
+            or (f"usuario#{proposer_user_id}" if proposer_user_id > 0 else "desconocido")
         )
         created = str(proposal.get("created_at") or "")
         dataset_entry = str(proposal.get("dataset_entry") or "").strip() or _format_scope_dataset_entry(scope, 1)
@@ -6104,7 +6104,7 @@ def _header_people_review(request: gr.Request):
 def _render_review_link_button(slug: str) -> str:
     href = f"/review/?slug={quote((slug or '').strip().lower(), safe='-')}"
     return (
-        f"<a class='the-list-review-btn' href='{href}' title='Admin review' aria-label='Admin review'>"
+        f"<a class='the-list-review-btn' href='{href}' title='Revisión administrativa' aria-label='Revisión administrativa'>"
         f"<img src='{REVIEW_BUTTON_ICON_SRC}' alt='' aria-hidden='true' loading='lazy'/>"
         "</a>"
     )
@@ -6115,7 +6115,7 @@ def _build_review_slug_filter_update(
     proposals: Sequence[Dict[str, object]] | None = None,
 ) -> tuple[gr.update, str]:
     normalized_slug = (selected_slug or "").strip().lower()
-    choices: List[Tuple[str, str]] = [("All slugs", "")]
+    choices: List[Tuple[str, str]] = [("Todos los slugs", "")]
     known_slugs = {""}
     source_rows = list(proposals) if proposals is not None else _fetch_change_proposals(limit=2000)
     for proposal in source_rows:
@@ -6126,7 +6126,7 @@ def _build_review_slug_filter_update(
         known_slugs.add(slug)
 
     if normalized_slug and normalized_slug not in known_slugs:
-        choices.append((f"{normalized_slug} (missing slug)", normalized_slug))
+        choices.append((f"{normalized_slug} (slug no encontrado)", normalized_slug))
         known_slugs.add(normalized_slug)
 
     selected_value = normalized_slug if normalized_slug in known_slugs else ""
@@ -6136,30 +6136,30 @@ def _build_review_slug_filter_update(
 def _review_summary(slug_filter: str) -> str:
     normalized_slug = (slug_filter or "").strip().lower()
     if not normalized_slug:
-        return "Reviewing tracked proposals for all slugs."
-    return f"Reviewing tracked proposals for slug `{normalized_slug}`."
+        return "Revisando propuestas en seguimiento para todos los slugs."
+    return f"Revisando propuestas en seguimiento para el slug `{normalized_slug}`."
 
 
 def _build_proposal_help_messages(user_name: str, user_email: str, can_submit: bool) -> tuple[str, str]:
     if not can_submit:
         disabled_message = (
-            "Your `base_user` privilege is currently disabled. Contact a creator if this was removed by mistake."
+            "Tu privilegio `base_user` está desactivado. Contacta a un creador si se eliminó por error."
         )
         return disabled_message, disabled_message
 
     signed_in = (
-        f"Signed in as **{html.escape(user_name)}** (`{html.escape(user_email or 'unknown')}`). "
+        f"Sesión iniciada como **{html.escape(user_name)}** (`{html.escape(user_email or 'desconocido')}`). "
     )
     return (
-        signed_in + "Submit an article proposal and reviewers will review the tracked diff.",
-        signed_in + "Submit a card proposal and reviewers will review the tracked diff.",
+        signed_in + "Envía una propuesta de artículo y los revisores evaluarán el diff en seguimiento.",
+        signed_in + "Envía una propuesta de tarjeta y los revisores evaluarán el diff en seguimiento.",
     )
 
 
 def _load_people_page(request: gr.Request):
     try:
         user, is_admin, can_submit = _role_flags_from_request(request)
-        user_name = str(user.get("name") or user.get("email") or "User")
+        user_name = str(user.get("name") or user.get("email") or "Usuario")
         user_email = str(user.get("email") or "").strip().lower()
         markdown_help, card_help = _build_proposal_help_messages(user_name, user_email, can_submit)
         empty_filter_choices = [(TAG_FILTER_ALL_OPTION, TAG_FILTER_ALL_OPTION)]
@@ -6174,7 +6174,7 @@ def _load_people_page(request: gr.Request):
                 bucket_value = str(person.get("title") or person.get("bucket") or "")
                 tags_value = _tags_to_text(person.get("tags", []))
                 return (
-                    f"<h2>{html.escape(name_value or 'Player')}</h2>",
+                    f"<h2>{html.escape(name_value or 'Receta')}</h2>",
                     gr.update(visible=False),
                     empty_filter_update,
                     [],
@@ -6203,7 +6203,7 @@ def _load_people_page(request: gr.Request):
                     "",
                 )
             return (
-                "<h2>The List</h2>",
+                "<h2>Recetas</h2>",
                 gr.update(visible=False),
                 empty_filter_update,
                 [],
@@ -6241,7 +6241,7 @@ def _load_people_page(request: gr.Request):
         )
         cards_html = _render_cards(_filter_people_for_tag_selection(people, _tag_filter_selection))
         return (
-            "<h2>The List</h2>",
+            "<h2>Recetas</h2>",
             gr.update(visible=True),
             tag_filter_update,
             _tag_filter_selection,
@@ -6272,7 +6272,7 @@ def _load_people_page(request: gr.Request):
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to load people page: %s", exc)
         return (
-            "<h2>The List</h2>",
+            "<h2>Recetas</h2>",
             gr.update(visible=False),
             gr.update(choices=[(TAG_FILTER_ALL_OPTION, TAG_FILTER_ALL_OPTION)], value=[], interactive=True),
             [],
@@ -6326,10 +6326,10 @@ def _load_people_review_page(request: gr.Request, review_view_mode: str = DEFAUL
             admin_diff,
             admin_scope,
             admin_change_groups,
-        ) = _empty_admin_review_panels("Reviewer access is required.", review_view_mode=review_view_mode)
+        ) = _empty_admin_review_panels("Se requieren permisos de revisor.", review_view_mode=review_view_mode)
         return (
-            "## The List Review",
-            "Reviewer access is required to open the review dashboard.",
+            "## Revisión de Recetas",
+            "Se requieren permisos de revisor para abrir el panel de revisión.",
             gr.update(choices=[], value=None, interactive=False),
             slug_filter,
             gr.update(choices=[], value=None),
@@ -6344,7 +6344,7 @@ def _load_people_review_page(request: gr.Request, review_view_mode: str = DEFAUL
             admin_diff,
             admin_scope,
             admin_change_groups,
-            "❌ Reviewer access is required.",
+            "❌ Se requieren permisos de revisor.",
         )
 
     all_proposals = _fetch_change_proposals(limit=2000)
@@ -6379,7 +6379,7 @@ def _load_people_review_page(request: gr.Request, review_view_mode: str = DEFAUL
         review_view_mode=review_view_mode,
     )
     return (
-        "## The List Review",
+        "## Revisión de Recetas",
         _review_summary(normalized_slug_filter),
         slug_filter_update,
         normalized_slug_filter,
@@ -6403,10 +6403,10 @@ def _empty_admin_review_panels(
     reason: str,
     review_view_mode: str = DEFAULT_REVIEW_VIEW,
 ) -> tuple[str, str, gr.update, gr.update, gr.update, gr.update, gr.update, gr.update, gr.update, str, str]:
-    message = reason or "No proposal selected."
-    empty_compiled_base = _render_review_markdown_panel("Base state (compiled)", "")
-    empty_compiled_current = _render_review_markdown_panel("Current state (compiled)", "")
-    empty_compiled_proposed = _render_review_markdown_panel("Proposed state (compiled)", "")
+    message = reason or "No hay ninguna propuesta seleccionada."
+    empty_compiled_base = _render_review_markdown_panel("Estado base (compilado)", "")
+    empty_compiled_current = _render_review_markdown_panel("Estado actual (compilado)", "")
+    empty_compiled_proposed = _render_review_markdown_panel("Estado propuesto (compilado)", "")
     (
         compiled_base_update,
         compiled_current_update,
@@ -6463,11 +6463,11 @@ def _toggle_admin_review_view_mode(
     collapse_base_current = raw_base == raw_current
 
     compiled_base = _render_review_markdown_panel(
-        "Base state (=Current state) (compiled)" if collapse_base_current else "Base state (compiled)",
+        "Estado base (=estado actual) (compilado)" if collapse_base_current else "Estado base (compilado)",
         "",
     )
-    compiled_current = _render_review_markdown_panel("Current state (compiled)", "")
-    compiled_proposed = _render_review_markdown_panel("Proposed state (compiled)", "")
+    compiled_current = _render_review_markdown_panel("Estado actual (compilado)", "")
+    compiled_proposed = _render_review_markdown_panel("Estado propuesto (compilado)", "")
 
     if raw_base.strip() or raw_current.strip() or raw_proposed.strip():
         (
@@ -6664,38 +6664,38 @@ def _submit_markdown_proposal(
     try:
         user, _, can_submit = _role_flags_from_request(request)
         if not user:
-            return _response("❌ You must be logged in to submit a proposal.", proposal_note)
+            return _response("❌ Debes iniciar sesión para enviar una propuesta.", proposal_note)
         if not can_submit:
             return _response(
-                "❌ Your `base_user` privilege is disabled. Ask a creator to restore access.",
+                "❌ Tu privilegio `base_user` está deshabilitado. Pide a un creador que restaure el acceso.",
                 proposal_note,
             )
 
         slug = (current_slug or "").strip().lower()
         if not slug:
-            return _response("❌ Open a player profile before submitting a proposal.", proposal_note)
+            return _response("❌ Abre un perfil antes de enviar una propuesta.", proposal_note)
 
         person = _fetch_person(slug)
         if person is None:
-            return _response("❌ Player profile not found.", proposal_note)
+            return _response("❌ No se encontró el perfil.", proposal_note)
         person_id = int(person.get("person_id") or 0)
         if person_id <= 0:
-            return _response("❌ Could not resolve player id for this profile.", proposal_note)
+            return _response("❌ No se pudo resolver el id del perfil.", proposal_note)
 
         proposed_markdown = (proposal_markdown or "").strip()
         if not proposed_markdown:
-            return _response("❌ Proposed markdown cannot be empty.", proposal_note)
+            return _response("❌ El markdown propuesto no puede estar vacío.", proposal_note)
         if len(proposed_markdown) > 60000:
-            return _response("❌ Proposed markdown is too large (max 60,000 chars).", proposal_note)
+            return _response("❌ El markdown propuesto es demasiado grande (máx. 60,000 caracteres).", proposal_note)
 
         actor_user_id = _resolve_request_user_id(user)
         if actor_user_id <= 0:
-            return _response("❌ Could not resolve your user id.", proposal_note)
+            return _response("❌ No se pudo resolver tu id de usuario.", proposal_note)
 
         note_value = (proposal_note or "").strip()
         base_markdown = str(person.get("markdown") or "")
         if proposed_markdown == base_markdown:
-            return _response("❌ No changes detected in the article.", proposal_note)
+            return _response("❌ No se detectaron cambios en el artículo.", proposal_note)
 
         _ensure_local_db()
         with session_scope() as session:
@@ -6760,13 +6760,13 @@ def _submit_markdown_proposal(
             )
 
         return _response(
-            f"✅ Article proposal #{proposal_id} submitted. It is now tracked and pending reviewer review.",
+            f"✅ Propuesta de artículo #{proposal_id} enviada. Ahora está registrada y pendiente de revisión.",
             "",
             close_editor=True,
         )
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to submit change proposal: %s", exc)
-        return _response(f"❌ Could not submit proposal: {exc}", proposal_note)
+        return _response(f"❌ No se pudo enviar la propuesta: {exc}", proposal_note)
 
 
 def _submit_card_proposal(
@@ -6822,10 +6822,10 @@ def _submit_card_proposal(
     try:
         user, _, can_submit = _role_flags_from_request(request)
         if not user:
-            return _response("❌ You must be logged in to submit a proposal.", proposal_note, gr.update(value=None))
+            return _response("❌ Debes iniciar sesión para enviar una propuesta.", proposal_note, gr.update(value=None))
         if not can_submit:
             return _response(
-                "❌ Your `base_user` privilege is disabled. Ask a creator to restore access.",
+                "❌ Tu privilegio `base_user` está deshabilitado. Pide a un creador que restaure el acceso.",
                 proposal_note,
                 gr.update(value=None),
             )
@@ -6833,21 +6833,21 @@ def _submit_card_proposal(
         slug = (current_slug or "").strip().lower()
         if not slug:
             return _response(
-                "❌ Open a player profile before submitting a proposal.",
+                "❌ Abre un perfil antes de enviar una propuesta.",
                 proposal_note,
                 gr.update(value=None),
             )
 
         person = _fetch_person(slug)
         if person is None:
-            return _response("❌ Player profile not found.", proposal_note, gr.update(value=None))
+            return _response("❌ No se encontró el perfil.", proposal_note, gr.update(value=None))
         person_id = int(person.get("person_id") or 0)
         if person_id <= 0:
-            return _response("❌ Could not resolve player id for this profile.", proposal_note, gr.update(value=None))
+            return _response("❌ No se pudo resolver el id del perfil.", proposal_note, gr.update(value=None))
 
         actor_user_id = _resolve_request_user_id(user)
         if actor_user_id <= 0:
-            return _response("❌ Could not resolve your user id.", proposal_note, gr.update(value=None))
+            return _response("❌ No se pudo resolver tu id de usuario.", proposal_note, gr.update(value=None))
         actor_email = (user.get("email") or "").strip().lower()
         actor_storage_identity = actor_email or f"user-{actor_user_id}"
 
@@ -6855,9 +6855,9 @@ def _submit_card_proposal(
         proposed_title = str(proposal_bucket or "").strip()
         proposed_tags = _parse_tags_input(proposal_tags)
         if not proposed_name:
-            return _response("❌ Card name cannot be empty.", proposal_note, gr.update(value=None))
+            return _response("❌ El nombre de la tarjeta no puede estar vacío.", proposal_note, gr.update(value=None))
         if not proposed_title:
-            return _response("❌ Card title cannot be empty.", proposal_note, gr.update(value=None))
+            return _response("❌ El título de la tarjeta no puede estar vacío.", proposal_note, gr.update(value=None))
         base_name_key = _normalize_name_key(str(person.get("name") or ""))
         proposed_name_key = _normalize_name_key(proposed_name)
         if proposed_name_key != base_name_key:
@@ -6882,7 +6882,7 @@ def _submit_card_proposal(
             _serialize_card_snapshot(base_snapshot) == _serialize_card_snapshot(proposed_snapshot)
             and base_image_url == proposed_image_url
         ):
-            return _response("❌ No card changes detected.", proposal_note, gr.update(value=None))
+            return _response("❌ No se detectaron cambios en la tarjeta.", proposal_note, gr.update(value=None))
 
         note_value = (proposal_note or "").strip()
         base_payload = _serialize_card_snapshot(base_snapshot)
@@ -6954,14 +6954,14 @@ def _submit_card_proposal(
             )
 
         return _response(
-            f"✅ Card proposal #{proposal_id} submitted. It is now tracked and pending reviewer review.",
+            f"✅ Propuesta de tarjeta #{proposal_id} enviada. Ahora está registrada y pendiente de revisión.",
             "",
             gr.update(value=None),
             close_editor=True,
         )
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to submit card proposal: %s", exc)
-        return _response(f"❌ Could not submit proposal: {exc}", proposal_note, gr.update(value=None))
+        return _response(f"❌ No se pudo enviar la propuesta: {exc}", proposal_note, gr.update(value=None))
 
 
 def _change_admin_slug_filter(slug_filter: str, review_view_mode: str, request: gr.Request):
@@ -6980,10 +6980,10 @@ def _change_admin_slug_filter(slug_filter: str, review_view_mode: str, request: 
             admin_diff,
             admin_scope,
             admin_change_groups,
-        ) = _empty_admin_review_panels("Reviewer access is required.", review_view_mode=review_view_mode)
+        ) = _empty_admin_review_panels("Se requieren permisos de revisor.", review_view_mode=review_view_mode)
         return (
             "",
-            "Reviewer access is required.",
+            "Se requieren permisos de revisor.",
             gr.update(choices=[], value=None),
             admin_meta,
             admin_images,
@@ -6996,7 +6996,7 @@ def _change_admin_slug_filter(slug_filter: str, review_view_mode: str, request: 
             admin_diff,
             admin_scope,
             admin_change_groups,
-            "❌ Reviewer access is required.",
+            "❌ Se requieren permisos de revisor.",
         )
     (
         selector_update,
@@ -7046,7 +7046,7 @@ def _refresh_admin_panel(slug_filter: str, review_view_mode: str, request: gr.Re
             admin_diff,
             admin_scope,
             admin_change_groups,
-        ) = _empty_admin_review_panels("Reviewer access is required.", review_view_mode=review_view_mode)
+        ) = _empty_admin_review_panels("Se requieren permisos de revisor.", review_view_mode=review_view_mode)
         return (
             gr.update(choices=[], value=None),
             admin_meta,
@@ -7060,7 +7060,7 @@ def _refresh_admin_panel(slug_filter: str, review_view_mode: str, request: gr.Re
             admin_diff,
             admin_scope,
             admin_change_groups,
-            "❌ Reviewer access is required.",
+            "❌ Se requieren permisos de revisor.",
         )
     (
         selector_update,
@@ -7108,7 +7108,7 @@ def _select_admin_proposal(proposal_id: str, slug_filter: str, review_view_mode:
             admin_diff,
             admin_scope,
             admin_change_groups,
-        ) = _empty_admin_review_panels("Reviewer access is required.", review_view_mode=review_view_mode)
+        ) = _empty_admin_review_panels("Se requieren permisos de revisor.", review_view_mode=review_view_mode)
         return (
             admin_meta,
             admin_images,
@@ -7121,7 +7121,7 @@ def _select_admin_proposal(proposal_id: str, slug_filter: str, review_view_mode:
             admin_diff,
             admin_scope,
             admin_change_groups,
-            "❌ Reviewer access is required.",
+            "❌ Se requieren permisos de revisor.",
         )
 
     selected = str(proposal_id or "").strip()
@@ -7179,7 +7179,7 @@ def _preview_admin_proposed_edit(
 ):
     user, is_admin, _ = _role_flags_from_request(request, refresh_if_not_admin=True)
     if not user or not is_admin:
-        return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), "❌ Reviewer access is required."
+        return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), "❌ Se requieren permisos de revisor."
 
     selected = str(proposal_id or "").strip()
     selected_ref = _parse_proposal_choice_value(selected)
@@ -7201,12 +7201,12 @@ def _preview_admin_proposed_edit(
     )
     if scope == PROPOSAL_SCOPE_CARD:
         if selected_ref is None:
-            return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), "❌ Select a valid proposal first."
+            return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), "❌ Selecciona primero una propuesta válida."
         if proposal is None:
-            return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), "❌ Proposal not found."
+            return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), "❌ Propuesta no encontrada."
         candidate = proposed_raw.strip()
         if not candidate:
-            return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), "❌ Proposed card JSON cannot be empty."
+            return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), "❌ El JSON de tarjeta propuesto no puede estar vacío."
         try:
             parsed = json.loads(candidate)
         except json.JSONDecodeError as exc:
@@ -7216,10 +7216,10 @@ def _preview_admin_proposed_edit(
                 gr.update(),
                 gr.update(),
                 gr.update(),
-                f"❌ Proposed card JSON is invalid: {exc.msg}.",
+                f"❌ El JSON de tarjeta propuesto no es válido: {exc.msg}.",
             )
         if not isinstance(parsed, dict):
-            return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), "❌ Proposed card JSON must be an object."
+            return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), "❌ El JSON de tarjeta propuesto debe ser un objeto."
         proposed_raw = json.dumps(
             _deserialize_card_snapshot(json.dumps(parsed, ensure_ascii=True)),
             ensure_ascii=True,
@@ -7237,12 +7237,12 @@ def _preview_admin_proposed_edit(
 
     elif scope == PROPOSAL_SCOPE_CARD_ARTICLE:
         if selected_ref is None:
-            return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), "❌ Select a valid proposal first."
+            return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), "❌ Selecciona primero una propuesta válida."
         if proposal is None:
-            return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), "❌ Proposal not found."
+            return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), "❌ Propuesta no encontrada."
         candidate = proposed_raw.strip()
         if not candidate:
-            return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), "❌ Proposed card+article JSON cannot be empty."
+            return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), "❌ El JSON propuesto de tarjeta+artículo no puede estar vacío."
         try:
             parsed = json.loads(candidate)
         except json.JSONDecodeError as exc:
@@ -7252,10 +7252,10 @@ def _preview_admin_proposed_edit(
                 gr.update(),
                 gr.update(),
                 gr.update(),
-                f"❌ Proposed card+article JSON is invalid: {exc.msg}.",
+                f"❌ El JSON propuesto de tarjeta+artículo no es válido: {exc.msg}.",
             )
         if not isinstance(parsed, dict):
-            return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), "❌ Proposed card+article JSON must be an object."
+            return gr.update(), gr.update(), gr.update(), gr.update(), gr.update(), "❌ El JSON propuesto de tarjeta+artículo debe ser un objeto."
         proposed_raw = json.dumps(
             _deserialize_card_article_snapshot(json.dumps(parsed, ensure_ascii=True)),
             ensure_ascii=True,
@@ -7344,7 +7344,7 @@ def _apply_review_change_choice(
             gr.update(),
             gr.update(),
             gr.update(),
-            "❌ Reviewer access is required.",
+            "❌ Se requieren permisos de revisor.",
         )
 
     scope = _normalize_proposal_scope(scope_value)
@@ -7356,7 +7356,7 @@ def _apply_review_change_choice(
             gr.update(),
             gr.update(),
             gr.update(),
-            "⚠️ Group picker is available for article proposals only.",
+            "⚠️ El selector por grupos solo está disponible para propuestas de artículo.",
         )
 
     try:
@@ -7369,7 +7369,7 @@ def _apply_review_change_choice(
             gr.update(),
             gr.update(),
             gr.update(),
-            "❌ Invalid change action payload.",
+            "❌ Carga de acción de cambio no válida.",
         )
     source = str((action or {}).get("source") or "").strip().lower()
     group_id = int((action or {}).get("change_id") or 0)
@@ -7406,7 +7406,7 @@ def _apply_review_change_choice(
             gr.update(),
             gr.update(),
             gr.update(),
-            f"⚠️ Change group #{group_id} is no longer available.",
+            f"⚠️ El grupo de cambios #{group_id} ya no está disponible.",
         )
 
     base_lines = str(base_raw_value or "").splitlines()
@@ -7477,7 +7477,7 @@ def _apply_review_change_choice(
         ),
         scope=scope,
     )[3]
-    status = f"✅ Applied change group #{group_id} from `{source}`."
+    status = f"✅ Se aplicó el grupo de cambios #{group_id} desde `{source}`."
     return (
         next_proposed_raw,
         compiled_base_update,
@@ -7499,13 +7499,13 @@ def _accept_admin_proposal(
     user, is_admin, _ = _role_flags_from_request(request, refresh_if_not_admin=True)
     if not user or not is_admin:
         panel = _build_admin_panel(slug_filter=slug_filter, review_view_mode=review_view_mode)
-        return ("❌ Reviewer access is required.", *panel)
+        return ("❌ Se requieren permisos de revisor.", *panel)
 
     selected = str(proposal_id or "").strip()
     selected_ref = _parse_proposal_choice_value(selected)
     if selected_ref is None:
         panel = _build_admin_panel(slug_filter=slug_filter, review_view_mode=review_view_mode)
-        return ("❌ Select a valid proposal first.", *panel)
+        return ("❌ Selecciona primero una propuesta válida.", *panel)
 
     proposal_source, proposal_id_int, source_proposal_type = selected_ref
     proposal = _fetch_proposal_by_id(
@@ -7515,12 +7515,12 @@ def _accept_admin_proposal(
     )
     if proposal is None:
         panel = _build_admin_panel(slug_filter=slug_filter, review_view_mode=review_view_mode)
-        return ("❌ Proposal not found.", *panel)
+        return ("❌ Propuesta no encontrada.", *panel)
 
     status = str(proposal.get("status") or "").strip().lower()
     if status != "pending":
         panel = _build_admin_panel(selected, slug_filter=slug_filter, review_view_mode=review_view_mode)
-        return (f"⚠️ Proposal #{proposal_id_int} is already `{status or 'unknown'}`.", *panel)
+        return (f"⚠️ Propuesta #{proposal_id_int} ya está `{status or 'desconocido'}`.", *panel)
 
     if proposal_source == PROPOSAL_SOURCE_SOURCE:
         normalized_source_type = _normalize_source_proposal_type(
@@ -7529,7 +7529,7 @@ def _accept_admin_proposal(
         admin_user_id = _resolve_request_user_id(user)
         if admin_user_id <= 0:
             panel = _build_admin_panel(selected, slug_filter=slug_filter, review_view_mode=review_view_mode)
-            return ("❌ Could not resolve reviewer user id.", *panel)
+            return ("❌ No se pudo resolver el id del usuario revisor.", *panel)
 
         _ensure_local_db()
         try:
@@ -7548,7 +7548,7 @@ def _accept_admin_proposal(
                     )
         except Exception as exc:  # noqa: BLE001
             panel = _build_admin_panel(selected, slug_filter=slug_filter, review_view_mode=review_view_mode)
-            return (f"❌ Cannot accept source proposal #{proposal_id_int}: {exc}", *panel)
+            return (f"❌ No se puede aceptar la propuesta de fuente #{proposal_id_int}: {exc}", *panel)
 
         next_pending_for_source = _next_pending_proposal_for_slug(
             source_slug,
@@ -7566,11 +7566,11 @@ def _accept_admin_proposal(
         if normalized_source_type == SOURCE_PROPOSAL_TYPE_TAGS:
             file_id = int(proposal.get("unsorted_file_id") or 0)
             return (
-                f"✅ Source tags proposal #{proposal_id_int} accepted for unsorted file `#{file_id}`.",
+                f"✅ Propuesta de etiquetas de fuente #{proposal_id_int} aceptada para archivo sin clasificar `#{file_id}`.",
                 *panel,
             )
         return (
-            f"✅ Source proposal #{proposal_id_int} accepted and file moved into source `{source_slug}`.",
+            f"✅ Propuesta de fuente #{proposal_id_int} aceptada y archivo movido a la fuente `{source_slug}`.",
             *panel,
         )
 
@@ -7582,15 +7582,15 @@ def _accept_admin_proposal(
         reviewed_clean = reviewed_value.strip()
         if not reviewed_clean:
             panel = _build_admin_panel(selected, slug_filter=slug_filter, review_view_mode=review_view_mode)
-            return ("❌ Proposed card JSON cannot be empty.", *panel)
+            return ("❌ El JSON de tarjeta propuesto no puede estar vacío.", *panel)
         try:
             parsed = json.loads(reviewed_clean)
         except json.JSONDecodeError as exc:
             panel = _build_admin_panel(selected, slug_filter=slug_filter, review_view_mode=review_view_mode)
-            return (f"❌ Proposed card JSON is invalid: {exc.msg}.", *panel)
+            return (f"❌ El JSON de tarjeta propuesto no es válido: {exc.msg}.", *panel)
         if not isinstance(parsed, dict):
             panel = _build_admin_panel(selected, slug_filter=slug_filter, review_view_mode=review_view_mode)
-            return ("❌ Proposed card JSON must be an object.", *panel)
+            return ("❌ El JSON de tarjeta propuesto debe ser un objeto.", *panel)
         card_fallback_snapshot = (
             _card_snapshot_from_person(person)
             if person is not None
@@ -7604,22 +7604,22 @@ def _accept_admin_proposal(
         reviewed_clean = reviewed_value.strip()
         if not reviewed_clean:
             panel = _build_admin_panel(selected, slug_filter=slug_filter, review_view_mode=review_view_mode)
-            return ("❌ Proposed card+article JSON cannot be empty.", *panel)
+            return ("❌ El JSON propuesto de tarjeta+artículo no puede estar vacío.", *panel)
         try:
             parsed = json.loads(reviewed_clean)
         except json.JSONDecodeError as exc:
             panel = _build_admin_panel(selected, slug_filter=slug_filter, review_view_mode=review_view_mode)
-            return (f"❌ Proposed card+article JSON is invalid: {exc.msg}.", *panel)
+            return (f"❌ El JSON propuesto de tarjeta+artículo no es válido: {exc.msg}.", *panel)
         if not isinstance(parsed, dict):
             panel = _build_admin_panel(selected, slug_filter=slug_filter, review_view_mode=review_view_mode)
-            return ("❌ Proposed card+article JSON must be an object.", *panel)
+            return ("❌ El JSON propuesto de tarjeta+artículo debe ser un objeto.", *panel)
         # Keep the raw combined payload
         proposed_markdown = reviewed_clean
     else:
         proposed_markdown = reviewed_value
         if not proposed_markdown.strip():
             panel = _build_admin_panel(selected, slug_filter=slug_filter, review_view_mode=review_view_mode)
-            return ("❌ Proposed markdown cannot be empty.", *panel)
+            return ("❌ El markdown propuesto no puede estar vacío.", *panel)
 
     base_image_url = ""
     proposed_image_url = ""
@@ -7663,16 +7663,16 @@ def _accept_admin_proposal(
         except Exception as exc:  # noqa: BLE001
             logger.exception("Failed to materialize missing profile for proposal #%s: %s", proposal_id_int, exc)
             panel = _build_admin_panel(selected, slug_filter=slug_filter, review_view_mode=review_view_mode)
-            return (f"❌ Cannot accept proposal #{proposal_id_int}: {exc}", *panel)
+            return (f"❌ No se puede aceptar la propuesta #{proposal_id_int}: {exc}", *panel)
         person = _fetch_profile_for_source(person_slug, proposal_source)
         if person is None:
             panel = _build_admin_panel(selected, slug_filter=slug_filter, review_view_mode=review_view_mode)
-            return (f"❌ Cannot accept proposal #{proposal_id_int}: card `{person_slug}` could not be created.", *panel)
+            return (f"❌ No se puede aceptar la propuesta #{proposal_id_int}: no se pudo crear la tarjeta `{person_slug}`.", *panel)
 
     person_id = int(person.get("person_id") or 0)
     if person_id <= 0:
         panel = _build_admin_panel(selected, slug_filter=slug_filter, review_view_mode=review_view_mode)
-        return ("❌ Cannot resolve person id for this card.", *panel)
+        return ("❌ No se pudo resolver el id del perfil para esta tarjeta.", *panel)
 
     proposed_payload_value = proposed_markdown
     if scope == PROPOSAL_SCOPE_CARD:
@@ -7694,8 +7694,8 @@ def _accept_admin_proposal(
     admin_user_id = _resolve_request_user_id(user)
     if admin_user_id <= 0:
         panel = _build_admin_panel(selected, slug_filter=slug_filter, review_view_mode=review_view_mode)
-        return ("❌ Could not resolve reviewer user id.", *panel)
-    review_note = "Accepted by reviewer from The List review panel"
+        return ("❌ No se pudo resolver el id del usuario revisor.", *panel)
+    review_note = "Aceptado por revisor desde el panel de revisión"
     is_theory = proposal_source == PROPOSAL_SOURCE_THEORY
     people_table = "app.theories" if is_theory else "app.people"
     cards_table = "app.theory_cards" if is_theory else "app.people_cards"
@@ -7704,7 +7704,7 @@ def _accept_admin_proposal(
 
     _ensure_local_db()
     with session_scope() as session:
-        default_title = str(person.get("title") or person.get("bucket") or "Unassigned")
+        default_title = str(person.get("title") or person.get("bucket") or "Sin asignar")
 
         if scope == PROPOSAL_SCOPE_CARD:
             base_snapshot = _card_snapshot_from_person(person)
@@ -7952,7 +7952,7 @@ def _accept_admin_proposal(
         review_view_mode=review_view_mode,
     )
     return (
-        f"✅ Proposal #{proposal_id_int} accepted and applied to `{person_slug}`.",
+        f"✅ Propuesta #{proposal_id_int} aceptada y aplicada a `{person_slug}`.",
         *panel,
     )
 
@@ -7965,7 +7965,7 @@ def _open_decline_modal(proposal_id: str):
             gr.update(visible=False),
             gr.update(value=""),
             "",
-            "❌ Select a valid proposal first.",
+            "❌ Selecciona primero una propuesta válida.",
         )
 
     proposal = _fetch_proposal_by_id(
@@ -7978,7 +7978,7 @@ def _open_decline_modal(proposal_id: str):
             gr.update(visible=False),
             gr.update(value=""),
             "",
-            "❌ Proposal not found.",
+            "❌ Propuesta no encontrada.",
         )
 
     status = str(proposal.get("status") or "").strip().lower()
@@ -7987,7 +7987,7 @@ def _open_decline_modal(proposal_id: str):
             gr.update(visible=False),
             gr.update(value=""),
             "",
-            f"⚠️ Proposal #{selected} is already `{status or 'unknown'}`.",
+            f"⚠️ Propuesta #{selected} ya está `{status or 'desconocido'}`.",
         )
 
     return (
@@ -8017,7 +8017,7 @@ def _decline_admin_proposal(
 
     if not user or not is_admin:
         return (
-            "❌ Reviewer access is required.",
+            "❌ Se requieren permisos de revisor.",
             gr.update(visible=False),
             gr.update(value=""),
             "",
@@ -8026,7 +8026,7 @@ def _decline_admin_proposal(
 
     if selected_ref is None:
         return (
-            "❌ Select a valid proposal first.",
+            "❌ Selecciona primero una propuesta válida.",
             gr.update(visible=False),
             gr.update(value=""),
             "",
@@ -8036,10 +8036,10 @@ def _decline_admin_proposal(
     reason = (decline_reason or "").strip()
     if not reason:
         return (
-            "❌ Decline reason is required.",
+            "❌ Se requiere un motivo de rechazo.",
             gr.update(visible=True),
             gr.update(value=decline_reason or ""),
-            "❌ Enter a reason before declining this proposal.",
+            "❌ Introduce un motivo antes de rechazar esta propuesta.",
             *panel,
         )
 
@@ -8052,7 +8052,7 @@ def _decline_admin_proposal(
     if proposal is None:
         panel = _build_admin_panel(slug_filter=slug_filter, review_view_mode=review_view_mode)
         return (
-            "❌ Proposal not found.",
+            "❌ Propuesta no encontrada.",
             gr.update(visible=False),
             gr.update(value=""),
             "",
@@ -8063,7 +8063,7 @@ def _decline_admin_proposal(
     if status != "pending":
         panel = _build_admin_panel(selected, slug_filter=slug_filter, review_view_mode=review_view_mode)
         return (
-            f"⚠️ Proposal #{proposal_id_int} is already `{status or 'unknown'}`.",
+            f"⚠️ Propuesta #{proposal_id_int} ya está `{status or 'desconocido'}`.",
             gr.update(visible=False),
             gr.update(value=""),
             "",
@@ -8074,7 +8074,7 @@ def _decline_admin_proposal(
     if admin_user_id <= 0:
         panel = _build_admin_panel(selected, slug_filter=slug_filter, review_view_mode=review_view_mode)
         return (
-            "❌ Could not resolve reviewer user id.",
+            "❌ No se pudo resolver el id del usuario revisor.",
             gr.update(visible=False),
             gr.update(value=""),
             "",
@@ -8123,14 +8123,14 @@ def _decline_admin_proposal(
         panel = _build_admin_panel(selected, slug_filter=slug_filter, review_view_mode=review_view_mode)
         if normalized_source_type == SOURCE_PROPOSAL_TYPE_TAGS:
             return (
-                f"✅ Source tags proposal #{proposal_id_int} declined.",
+                f"✅ Propuesta de etiquetas de fuente #{proposal_id_int} rechazada.",
                 gr.update(visible=False),
                 gr.update(value=""),
                 "",
                 *panel,
             )
         return (
-            f"✅ Source proposal #{proposal_id_int} declined.",
+            f"✅ Propuesta de fuente #{proposal_id_int} rechazada.",
             gr.update(visible=False),
             gr.update(value=""),
             "",
@@ -8174,7 +8174,7 @@ def _decline_admin_proposal(
 
     panel = _build_admin_panel(selected, slug_filter=slug_filter, review_view_mode=review_view_mode)
     return (
-        f"✅ Proposal #{proposal_id_int} declined.",
+        f"✅ Propuesta #{proposal_id_int} rechazada.",
         gr.update(visible=False),
         gr.update(value=""),
         "",
@@ -8193,7 +8193,7 @@ def _report_user_from_proposal(
     if not user or not is_admin:
         panel = _build_admin_panel(slug_filter=slug_filter, review_view_mode=review_view_mode)
         return (
-            "❌ Reviewer access is required.",
+            "❌ Se requieren permisos de revisor.",
             report_reason,
             *panel,
         )
@@ -8203,7 +8203,7 @@ def _report_user_from_proposal(
     if selected_ref is None:
         panel = _build_admin_panel(slug_filter=slug_filter, review_view_mode=review_view_mode)
         return (
-            "❌ Select a valid proposal first.",
+            "❌ Selecciona primero una propuesta válida.",
             report_reason,
             *panel,
         )
@@ -8217,24 +8217,24 @@ def _report_user_from_proposal(
     if proposal is None:
         panel = _build_admin_panel(slug_filter=slug_filter, review_view_mode=review_view_mode)
         return (
-            "❌ Proposal not found.",
+            "❌ Propuesta no encontrada.",
             report_reason,
             *panel,
         )
     if proposal_source == PROPOSAL_SOURCE_SOURCE:
         panel = _build_admin_panel(selected, slug_filter=slug_filter, review_view_mode=review_view_mode)
         return (
-            "❌ Reporting is not supported for source proposals.",
+            "❌ No se admite reportar propuestas de fuente.",
             report_reason,
             *panel,
         )
 
-    reason = (report_reason or "").strip() or "Reported by reviewer from The List review panel"
+    reason = (report_reason or "").strip() or "Reportado por revisor desde el panel de revisión"
     admin_user_id = _resolve_request_user_id(user)
     if admin_user_id <= 0:
         panel = _build_admin_panel(selected, slug_filter=slug_filter, review_view_mode=review_view_mode)
         return (
-            "❌ Could not resolve reviewer user id.",
+            "❌ No se pudo resolver el id del usuario revisor.",
             report_reason,
             *panel,
         )
@@ -8285,11 +8285,11 @@ def _report_user_from_proposal(
     role_updated = bool(target_email) and report_and_disable_user(target_email, admin_email, reason)
     panel = _build_admin_panel(selected, slug_filter=slug_filter, review_view_mode=review_view_mode)
     if role_updated and target_email:
-        message = f"✅ User `{target_email}` reported and `base_user` privilege removed."
+        message = f"✅ Usuario `{target_email}` reportado y privilegio `base_user` eliminado."
     elif target_email:
-        message = "⚠️ Proposal reported, but no user privilege record was updated."
+        message = "⚠️ Propuesta reportada, pero no se actualizó ningún registro de privilegios del usuario."
     else:
-        message = "⚠️ Proposal reported, but the proposer email could not be resolved for privilege updates."
+        message = "⚠️ Propuesta reportada, pero no se pudo resolver el correo del proponente para actualizar privilegios."
     return (
         message,
         "",
@@ -8301,7 +8301,7 @@ def make_people_app() -> gr.Blocks:
     stylesheet = _load_css()
     editor_js = _load_editor_js()
     with gr.Blocks(
-        title="The list",
+        title="Recetas",
         css=stylesheet or None,
         head=with_light_mode_head(editor_js),
     ) as app:
@@ -8311,10 +8311,10 @@ def make_people_app() -> gr.Blocks:
 
         with gr.Column(elem_id="people-shell"):
             with gr.Row(elem_id="people-title-row"):
-                title_md = gr.HTML("<h2>The List</h2>", elem_id="people-title")
+                title_md = gr.HTML("<h2>Recetas</h2>", elem_id="people-title")
                 with gr.Column(elem_id="people-filter-row", visible=False, scale=0, min_width=210) as tag_filter_row:
                     tag_filter = gr.Dropdown(
-                        label="Filter by tags",
+                        label="Filtrar por etiquetas",
                         choices=[(TAG_FILTER_ALL_OPTION, TAG_FILTER_ALL_OPTION)],
                         value=[],
                         multiselect=True,
@@ -8371,17 +8371,17 @@ def make_people_app() -> gr.Blocks:
             with gr.Column(visible=False, elem_id="the-list-proposal-shell") as proposal_shell:
                 proposal_help = gr.Markdown(elem_id="the-list-proposal-help")
                 proposal_note = gr.Textbox(
-                    label="Article change summary",
+                    label="Resumen del cambio del artículo",
                     lines=2,
-                    placeholder="Short summary for creators...",
+                    placeholder="Resumen breve para revisores...",
                 )
                 with gr.Row(elem_id="the-list-markdown-toolbar"):
-                    gr.Markdown("**Proposed article markdown**")
+                    gr.Markdown("**Markdown de artículo propuesto**")
                     with gr.Row(elem_id="the-list-markdown-toolbar-controls"):
                         proposal_view_mode = gr.Radio(
                             choices=[
-                                ("Compiled", MARKDOWN_VIEW_PREVIEW),
-                                ("Raw markdown", MARKDOWN_VIEW_RAW),
+                                ("Compilado", MARKDOWN_VIEW_PREVIEW),
+                                ("Markdown en bruto", MARKDOWN_VIEW_RAW),
                             ],
                             value=DEFAULT_MARKDOWN_VIEW,
                             show_label=False,
@@ -8395,31 +8395,31 @@ def make_people_app() -> gr.Blocks:
                     proposal_markdown = gr.Textbox(
                         show_label=False,
                         lines=14,
-                        placeholder="Edit the article markdown here...",
+                        placeholder="Edita el markdown del artículo aquí...",
                         elem_id="the-list-proposal-markdown-input",
                     )
                     proposal_preview = gr.Markdown(value="", visible=True, elem_id="the-list-proposal-preview")
                 with gr.Row(elem_id="the-list-proposal-actions"):
-                    submit_markdown_proposal_btn = gr.Button("Submit Article Proposal", variant="primary")
-                    cancel_markdown_edit_btn = gr.Button("Cancel", variant="secondary")
+                    submit_markdown_proposal_btn = gr.Button("Enviar propuesta de artículo", variant="primary")
+                    cancel_markdown_edit_btn = gr.Button("Cancelar", variant="secondary")
                 proposal_status = gr.Markdown(elem_id="the-list-proposal-status")
 
             with gr.Column(visible=False, elem_id="the-list-card-proposal-shell") as card_proposal_shell:
                 card_proposal_help = gr.Markdown(elem_id="the-list-card-proposal-help")
                 with gr.Row(elem_id="the-list-card-proposal-grid"):
-                    card_proposal_name = gr.Textbox(label="Card name", elem_id="the-list-card-proposal-name")
+                    card_proposal_name = gr.Textbox(label="Nombre de la tarjeta", elem_id="the-list-card-proposal-name")
                     card_proposal_bucket = gr.Textbox(
-                        label="Card title",
+                        label="Título de la tarjeta",
                         elem_id="the-list-card-proposal-bucket",
                     )
                 card_proposal_tags = gr.Textbox(
-                    label="Card tags",
+                    label="Etiquetas de la tarjeta",
                     lines=2,
-                    placeholder="Comma-separated tags (example: left-footed, crossing, stamina)",
+                    placeholder="Etiquetas separadas por comas (ejemplo: zurdo, centros, resistencia)",
                     elem_id="the-list-card-proposal-tags",
                 )
                 with gr.Row(elem_id="the-list-card-image-row"):
-                    gr.Markdown("**Card image**")
+                    gr.Markdown("**Imagen de la tarjeta**")
                     card_proposal_image = gr.UploadButton(
                         "+",
                         file_types=["image"],
@@ -8429,14 +8429,14 @@ def make_people_app() -> gr.Blocks:
                         min_width=40,
                     )
                 card_proposal_note = gr.Textbox(
-                    label="Card change summary",
+                    label="Resumen del cambio de tarjeta",
                     lines=2,
-                    placeholder="Short summary for creators...",
+                    placeholder="Resumen breve para revisores...",
                     elem_id="the-list-card-proposal-note",
                 )
                 with gr.Row(elem_id="the-list-card-proposal-actions"):
-                    submit_card_proposal_btn = gr.Button("Submit", variant="primary")
-                    cancel_card_edit_btn = gr.Button("Cancel", variant="secondary")
+                    submit_card_proposal_btn = gr.Button("Enviar", variant="primary")
+                    cancel_card_edit_btn = gr.Button("Cancelar", variant="secondary")
                 card_proposal_status = gr.Markdown(elem_id="the-list-card-proposal-status")
 
         app.load(timed_page_load("/recetas", _header_people), outputs=[hdr])
@@ -8619,26 +8619,26 @@ def make_people_review_app() -> gr.Blocks:
     stylesheet = _load_css()
     review_js = _load_review_js()
     with gr.Blocks(
-        title="The List Review",
+        title="Revisión de Recetas",
         css=stylesheet or None,
         head=with_light_mode_head(review_js),
     ) as app:
         hdr = gr.HTML()
         with gr.Column(elem_id="the-list-admin-shell"):
-            title_md = gr.Markdown("## The List Review")
+            title_md = gr.Markdown("## Revisión de Recetas")
             summary_md = gr.Markdown("")
             slug_filter_state = gr.Textbox(value="", visible=False, interactive=False)
             admin_scope_state = gr.Textbox(value="", visible=False, interactive=False)
             admin_change_groups_state = gr.Textbox(value="[]", visible=False, interactive=False)
             admin_change_action = gr.Textbox(value="", visible=False, interactive=True, elem_id="the-list-review-change-action")
             admin_apply_change_btn = gr.Button(
-                "Apply review change",
+                "Aplicar cambio de revisión",
                 visible=False,
                 elem_id="the-list-review-apply-change-btn",
             )
             with gr.Row(elem_id="the-list-admin-selector-row"):
                 admin_selector = gr.Dropdown(
-                    label="Tracked proposals",
+                    label="Propuestas en seguimiento",
                     choices=[],
                     value=None,
                     allow_custom_value=False,
@@ -8647,14 +8647,14 @@ def make_people_review_app() -> gr.Blocks:
                     scale=12,
                 )
                 refresh_admin_btn = gr.Button(
-                    "Refresh proposals",
+                    "Actualizar propuestas",
                     elem_id="the-list-admin-refresh-btn",
                     variant="secondary",
                     scale=1,
                 )
                 admin_card_selector = gr.Dropdown(
-                    label="Slug being reviewed",
-                    choices=[("All slugs", "")],
+                    label="Slug en revisión",
+                    choices=[("Todos los slugs", "")],
                     value="",
                     allow_custom_value=False,
                     interactive=True,
@@ -8666,11 +8666,11 @@ def make_people_review_app() -> gr.Blocks:
             with gr.Row(elem_id="the-list-admin-review-view-mode-row"):
                 admin_review_view_mode = gr.Radio(
                     choices=[
-                        ("Compiled", REVIEW_VIEW_COMPILED),
-                        ("Raw markdown", REVIEW_VIEW_RAW),
+                        ("Compilado", REVIEW_VIEW_COMPILED),
+                        ("Markdown en bruto", REVIEW_VIEW_RAW),
                     ],
                     value=DEFAULT_REVIEW_VIEW,
-                    label="Review view",
+                    label="Vista de revisión",
                     show_label=False,
                     container=False,
                     interactive=True,
@@ -8679,7 +8679,7 @@ def make_people_review_app() -> gr.Blocks:
                     min_width=240,
                 )
             with gr.Tabs(elem_id="the-list-admin-preview-tabs"):
-                with gr.Tab("Review"):
+                with gr.Tab("Revisión"):
                     with gr.Row(elem_id="the-list-admin-compiled-grid"):
                         admin_compiled_base = _markdown_component_allow_raw_html(elem_id="the-list-admin-compiled-base")
                         admin_compiled_current = _markdown_component_allow_raw_html(
@@ -8688,22 +8688,22 @@ def make_people_review_app() -> gr.Blocks:
                         admin_compiled_proposed = _markdown_component_allow_raw_html(
                             elem_id="the-list-admin-compiled-proposed"
                         )
-                with gr.Tab("Article raw payload"):
+                with gr.Tab("Contenido de artículo en bruto"):
                     with gr.Row(elem_id="the-list-admin-raw-grid"):
                         admin_raw_base = gr.Textbox(
-                            label="Base payload (raw)",
+                            label="Contenido base (bruto)",
                             lines=14,
                             interactive=False,
                             elem_id="the-list-admin-raw-base",
                         )
                         admin_raw_current = gr.Textbox(
-                            label="Current payload (raw)",
+                            label="Contenido actual (bruto)",
                             lines=14,
                             interactive=False,
                             elem_id="the-list-admin-raw-current",
                         )
                         admin_raw_proposed = gr.Textbox(
-                            label="Proposed payload (raw, editable)",
+                            label="Contenido propuesto (bruto, editable)",
                             lines=14,
                             interactive=True,
                             elem_id="the-list-admin-raw-proposed",
@@ -8711,34 +8711,34 @@ def make_people_review_app() -> gr.Blocks:
                     admin_diff = gr.HTML(elem_id="the-list-admin-diff")
             with gr.Row(elem_id="the-list-admin-review-actions"):
                 accept_btn = gr.Button(
-                    "Accept proposal",
+                    "Aceptar propuesta",
                     variant="primary",
                     elem_id="the-list-admin-accept-btn",
                 )
                 decline_btn = gr.Button(
-                    "Decline proposal",
+                    "Rechazar propuesta",
                     variant="stop",
                     elem_id="the-list-admin-decline-btn",
                 )
             report_reason = gr.Textbox(
-                label="Report reason",
+                label="Motivo del reporte",
                 lines=2,
-                placeholder="Reason for removing the user's `user` privilege...",
+                placeholder="Motivo para retirar el privilegio `user` al usuario...",
             )
-            report_btn = gr.Button("Report user and remove `user` privilege", variant="stop")
+            report_btn = gr.Button("Reportar usuario y quitar privilegio `user`", variant="stop")
             admin_status = gr.Markdown(elem_id="the-list-admin-status")
         with gr.Column(visible=False, elem_id="the-list-decline-modal-overlay") as decline_modal:
             with gr.Column(elem_id="the-list-decline-modal"):
-                gr.Markdown("### Decline proposal")
+                gr.Markdown("### Rechazar propuesta")
                 decline_reason = gr.Textbox(
-                    label="Reason",
+                    label="Motivo",
                     lines=4,
-                    placeholder="Explain why this proposal was declined...",
+                    placeholder="Explica por qué se rechazó esta propuesta...",
                 )
                 decline_modal_status = gr.Markdown(elem_id="the-list-decline-modal-status")
                 with gr.Row(elem_id="the-list-decline-modal-actions"):
-                    decline_cancel_btn = gr.Button("Cancel", variant="secondary")
-                    decline_confirm_btn = gr.Button("Decline proposal", variant="stop")
+                    decline_cancel_btn = gr.Button("Cancelar", variant="secondary")
+                    decline_confirm_btn = gr.Button("Rechazar propuesta", variant="stop")
 
         app.load(timed_page_load("/review", _header_people_review), outputs=[hdr])
         app.load(

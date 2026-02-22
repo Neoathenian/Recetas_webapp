@@ -17,7 +17,7 @@ def prepare_new_row(info_json: str):
             visible=True,
         ),
         gr.update(visible=True),
-        f"Creating new row in {table.name}. Fill the fields and click Save Row.",
+        f"Creando nueva fila en {table.name}. Completa los campos y haz clic en Guardar fila.",
         "new",
         "-1",
     )

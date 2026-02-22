@@ -169,7 +169,7 @@ button#the-list-card-edit-btn:focus-visible {
 }
 
 .person-detail-card__media--editable::after {
-  content: "Click image to replace";
+  content: "Haz clic en la imagen para reemplazarla";
   position: absolute;
   right: 0.52rem;
   bottom: 0.52rem;

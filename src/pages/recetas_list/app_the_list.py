@@ -68,11 +68,11 @@ def _load_tag_filter_js() -> str:
 
 def _render_cards(recipes: Sequence[Dict[str, object]]) -> str:
     if not recipes:
-        return '<div class="people-empty">No recipes are available yet.</div>'
+        return '<div class="people-empty">Aún no hay recetas disponibles.</div>'
 
     cards: List[str] = []
     for row in recipes:
-        name = html.escape(str(row.get("name") or "Recipe"))
+        name = html.escape(str(row.get("name") or "Receta"))
         slug = str(row.get("slug") or "")
         href = f"/receta/?slug={quote(slug, safe='-')}"
 
@@ -81,8 +81,8 @@ def _render_cards(recipes: Sequence[Dict[str, object]]) -> str:
         card_image_src = html.escape(card_image_file, quote=True) if card_image_file else ""
 
         tag_values = [_normalize_tag(str(tag)) for tag in row.get("tags", []) if str(tag).strip()]
-        tags_markup = _render_tag_chips(row.get("tags", []), empty_label="no-tags")
-        tools_markup = _render_tag_chips(row.get("tools", []), empty_label="no-tools")
+        tags_markup = _render_tag_chips(row.get("tags", []), empty_label="sin-etiquetas")
+        tools_markup = _render_tag_chips(row.get("tools", []), empty_label="sin-herramientas")
         tags_json_attr = html.escape(json.dumps(tag_values, ensure_ascii=True), quote=True)
         image_wrap_class = "person-card__image-wrap"
         media_markup = "<div class='recipe-card__swatch' aria-hidden='true'></div>"
@@ -99,11 +99,11 @@ def _render_cards(recipes: Sequence[Dict[str, object]]) -> str:
               <div class="person-card__content">
                 <h3 class="person-card__title">{name}</h3>
                 <div class="recipe-card__chip-group">
-                  <span class="recipe-card__chip-label">Tags</span>
+                  <span class="recipe-card__chip-label">Etiquetas</span>
                   <div class="person-card__tags">{tags_markup}</div>
                 </div>
                 <div class="recipe-card__chip-group">
-                  <span class="recipe-card__chip-label">Tools</span>
+                  <span class="recipe-card__chip-label">Herramientas</span>
                   <div class="person-card__tags">{tools_markup}</div>
                 </div>
               </div>
@@ -300,7 +300,7 @@ def _load_the_list_page(request: gr.Request):
             [],
             gr.update(choices=[(TOOL_FILTER_ALL_OPTION, TOOL_FILTER_ALL_OPTION)], value=[], interactive=True),
             [],
-            gr.update(value='<div class="people-empty">Could not load recipes.</div>', visible=True),
+            gr.update(value='<div class="people-empty">No se pudieron cargar las recetas.</div>', visible=True),
         )
 
 
@@ -318,8 +318,8 @@ def make_the_list_app() -> gr.Blocks:
             with gr.Row(elem_id="people-title-row"):
                 title_md = gr.HTML("<h2>Recetas</h2>", elem_id="people-title")
                 search_box = gr.Textbox(
-                    label="Search recipes",
-                    placeholder="Search recipes",
+                    label="Buscar recetas",
+                    placeholder="Buscar recetas",
                     value="",
                     lines=1,
                     interactive=True,
@@ -329,7 +329,7 @@ def make_the_list_app() -> gr.Blocks:
                 )
                 with gr.Row(elem_id="people-filter-row", visible=True) as tag_filter_row:
                     tag_filter = gr.Dropdown(
-                        label="Filter by tags",
+                        label="Filtrar por etiquetas",
                         choices=[(TAG_FILTER_ALL_OPTION, TAG_FILTER_ALL_OPTION)],
                         value=[],
                         multiselect=True,
@@ -340,7 +340,7 @@ def make_the_list_app() -> gr.Blocks:
                         elem_id="people-tag-filter",
                     )
                     tool_filter = gr.Dropdown(
-                        label="Filter by tools",
+                        label="Filtrar por herramientas",
                         choices=[(TOOL_FILTER_ALL_OPTION, TOOL_FILTER_ALL_OPTION)],
                         value=[],
                         multiselect=True,
@@ -349,6 +349,13 @@ def make_the_list_app() -> gr.Blocks:
                         show_label=False,
                         container=False,
                         elem_id="people-tool-filter",
+                    )
+                    gr.Button(
+                        "+",
+                        variant="secondary",
+                        elem_id="the-list-create-profile-trigger",
+                        scale=0,
+                        min_width=40,
                     )
 
             tag_filter_selection_state = gr.State([])

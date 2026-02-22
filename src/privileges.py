@@ -28,17 +28,17 @@ PAGE_REGISTRY: dict[str, PageLink] = {
     "the-list": PageLink("the-list", "Recetas", "/recetas/", "hdr-link hdr-link--the-list"),
     "the-list-review": PageLink(
         "the-list-review",
-        "Review",
+        "Revisión",
         "/review/",
         "hdr-link hdr-link--the-list-review",
     ),
     "privileges": PageLink(
         "privileges",
-        "Privileges",
+        "Privilegios",
         "/privileges/",
         "hdr-link hdr-link--privileges",
     ),
-    "admin": PageLink("admin", "Administration", "/admin/", "hdr-link hdr-link--admin"),
+    "admin": PageLink("admin", "Administración", "/admin/", "hdr-link hdr-link--admin"),
 }
 
 PRIVILEGE_PAGE_MAP: dict[str, set[str]] = {

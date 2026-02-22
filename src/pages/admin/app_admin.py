@@ -48,8 +48,8 @@ def _init_admin():
     if not tables:
         return (
             gr.update(choices=[], value=None),
-            "<p>No tables in schema <code>app</code>.</p>",
-            "No tables available.",
+            "<p>No hay tablas en el esquema <code>app</code>.</p>",
+            "No hay tablas disponibles.",
             "",
             json.dumps([]),
             gr.update(
@@ -117,7 +117,7 @@ def _handle_table_select(table: str):
 
 def make_admin_app() -> gr.Blocks:
     with gr.Blocks(
-        title="The List Admin",
+        title="Administración de Recetas",
         css=ADMIN_CSS,
         head=with_light_mode_head(None),
     ) as admin_app:
@@ -129,30 +129,30 @@ def make_admin_app() -> gr.Blocks:
         edit_mode_state = gr.State("")
 
         with gr.Column(elem_id="admin-shell"):
-            gr.Markdown("## Database Explorer")
+            gr.Markdown("## Explorador de base de datos")
             with gr.Row(equal_height=True, elem_classes=["admin-toolbar"]):
-                add_row_btn = gr.Button("➕ Add Row", variant="secondary")
+                add_row_btn = gr.Button("➕ Añadir fila", variant="secondary")
                 table_list = gr.Dropdown(
-                    label="Select table",
+                    label="Seleccionar tabla",
                     choices=list_tables(),
                     interactive=True,
                 )
             with gr.Column(elem_id="admin-upload-area"):
                 upload_btn = gr.UploadButton(
-                    "📤 Upload CSV",
+                    "📤 Subir CSV",
                     file_types=["text/csv", ".csv"],
                     file_count="single",
                     variant="secondary",
                     elem_id="admin-upload-button",
                 )
                 download_all_btn = gr.DownloadButton(
-                    "📥 Download All Tables",
+                    "📥 Descargar todas las tablas",
                     variant="secondary",
                     elem_id="admin-download-all-button",
                 )
             with gr.Column(elem_id="admin-editor-area"):
                 save_row_btn = gr.Button(
-                    "Save Row", variant="primary", visible=False
+                    "Guardar fila", variant="primary", visible=False
                 )
                 edit_df = gr.Dataframe(
                     headers=[""],
@@ -160,12 +160,12 @@ def make_admin_app() -> gr.Blocks:
                     row_count=1,
                     interactive=True,
                     wrap=True,
-                    label="Row editor",
+                    label="Editor de fila",
                     visible=False,
                     elem_id="admin-editor-df",
                 )
             table_html = gr.HTML()
-            status = gr.Markdown("Choose a table to view data.")
+            status = gr.Markdown("Selecciona una tabla para ver los datos.")
 
         selected_index_box = gr.Textbox(
             value="",
@@ -201,13 +201,13 @@ def make_admin_app() -> gr.Blocks:
         ) as delete_dialog:
             with gr.Column(elem_classes=["modal-content"]):
                 gr.Markdown(
-                    "Are you sure you want to delete this row?",
+                    "¿Seguro que quieres eliminar esta fila?",
                     elem_classes=["modal-text"],
                 )
                 with gr.Row(elem_classes=["modal-actions"]):
-                    confirm_delete_btn = gr.Button("Delete", variant="stop")
+                    confirm_delete_btn = gr.Button("Eliminar", variant="stop")
                     cancel_delete_btn = gr.Button(
-                        "Cancel", variant="secondary"
+                        "Cancelar", variant="secondary"
                     )
 
         admin_app.load(

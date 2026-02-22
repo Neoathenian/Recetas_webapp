@@ -57,26 +57,26 @@ def make_review_display_app() -> gr.Blocks:
     stylesheet = _load_css()
     review_js = _load_review_js()
     with gr.Blocks(
-        title="Recetas Review",
+        title="Revisión de Recetas",
         css=stylesheet or None,
         head=with_light_mode_head(review_js),
     ) as app:
         hdr = gr.HTML()
         with gr.Column(elem_id="the-list-admin-shell"):
-            title_md = gr.Markdown("## Recetas Review")
+            title_md = gr.Markdown("## Revisión de Recetas")
             summary_md = gr.Markdown("")
             slug_filter_state = gr.Textbox(value="", visible=False, interactive=False)
             admin_scope_state = gr.Textbox(value="", visible=False, interactive=False)
             admin_change_groups_state = gr.Textbox(value="[]", visible=False, interactive=False)
             admin_change_action = gr.Textbox(value="", visible=False, interactive=True, elem_id="the-list-review-change-action")
             admin_apply_change_btn = gr.Button(
-                "Apply review change",
+                "Aplicar cambio de revisión",
                 visible=False,
                 elem_id="the-list-review-apply-change-btn",
             )
             with gr.Row(elem_id="the-list-admin-selector-row"):
                 admin_selector = gr.Dropdown(
-                    label="Tracked proposals",
+                    label="Propuestas en seguimiento",
                     choices=[],
                     value=None,
                     allow_custom_value=False,
@@ -85,14 +85,14 @@ def make_review_display_app() -> gr.Blocks:
                     scale=12,
                 )
                 refresh_admin_btn = gr.Button(
-                    "Refresh proposals",
+                    "Actualizar propuestas",
                     elem_id="the-list-admin-refresh-btn",
                     variant="secondary",
                     scale=1,
                 )
                 admin_card_selector = gr.Dropdown(
-                    label="Slug being reviewed",
-                    choices=[("All slugs", "")],
+                    label="Slug en revisión",
+                    choices=[("Todos los slugs", "")],
                     value="",
                     allow_custom_value=False,
                     interactive=True,
@@ -107,11 +107,11 @@ def make_review_display_app() -> gr.Blocks:
             with gr.Row(elem_id="the-list-admin-review-view-mode-row"):
                 admin_review_view_mode = gr.Radio(
                     choices=[
-                        ("Compiled", REVIEW_VIEW_COMPILED),
-                        ("Raw markdown", REVIEW_VIEW_RAW),
+                        ("Compilado", REVIEW_VIEW_COMPILED),
+                        ("Markdown en bruto", REVIEW_VIEW_RAW),
                     ],
                     value=DEFAULT_REVIEW_VIEW,
-                    label="Review view",
+                    label="Vista de revisión",
                     show_label=False,
                     container=False,
                     interactive=True,
@@ -131,21 +131,21 @@ def make_review_display_app() -> gr.Blocks:
                     )
                 with gr.Row(elem_id="the-list-admin-raw-grid", visible=False):
                     admin_raw_base = gr.Textbox(
-                        label="Base payload (raw)",
+                        label="Contenido base (bruto)",
                         lines=14,
                         interactive=False,
                         visible=False,
                         elem_id="the-list-admin-raw-base",
                     )
                     admin_raw_current = gr.Textbox(
-                        label="Current payload (raw)",
+                        label="Contenido actual (bruto)",
                         lines=14,
                         interactive=False,
                         visible=False,
                         elem_id="the-list-admin-raw-current",
                     )
                     admin_raw_proposed = gr.Textbox(
-                        label="Proposed payload (raw, editable)",
+                        label="Contenido propuesto (bruto, editable)",
                         lines=14,
                         interactive=True,
                         visible=False,
@@ -153,34 +153,34 @@ def make_review_display_app() -> gr.Blocks:
                     )
             with gr.Row(elem_id="the-list-admin-review-actions"):
                 accept_btn = gr.Button(
-                    "Accept proposal",
+                    "Aceptar propuesta",
                     variant="primary",
                     elem_id="the-list-admin-accept-btn",
                 )
                 decline_btn = gr.Button(
-                    "Decline proposal",
+                    "Rechazar propuesta",
                     variant="stop",
                     elem_id="the-list-admin-decline-btn",
                 )
             report_reason = gr.Textbox(
-                label="Report reason",
+                label="Motivo del reporte",
                 lines=2,
-                placeholder="Reason for removing the user's `base_user` privilege...",
+                placeholder="Motivo para retirar el privilegio `base_user` al usuario...",
             )
-            report_btn = gr.Button("Report user and remove `base_user` privilege", variant="stop")
+            report_btn = gr.Button("Reportar usuario y quitar privilegio `base_user`", variant="stop")
             admin_status = gr.Markdown(elem_id="the-list-admin-status")
         with gr.Column(visible=False, elem_id="the-list-decline-modal-overlay") as decline_modal:
             with gr.Column(elem_id="the-list-decline-modal"):
-                gr.Markdown("### Decline proposal")
+                gr.Markdown("### Rechazar propuesta")
                 decline_reason = gr.Textbox(
-                    label="Reason",
+                    label="Motivo",
                     lines=4,
-                    placeholder="Explain why this proposal was declined...",
+                    placeholder="Explica por qué se rechazó esta propuesta...",
                 )
                 decline_modal_status = gr.Markdown(elem_id="the-list-decline-modal-status")
                 with gr.Row(elem_id="the-list-decline-modal-actions"):
-                    decline_cancel_btn = gr.Button("Cancel", variant="secondary")
-                    decline_confirm_btn = gr.Button("Decline proposal", variant="stop")
+                    decline_cancel_btn = gr.Button("Cancelar", variant="secondary")
+                    decline_confirm_btn = gr.Button("Rechazar propuesta", variant="stop")
 
         app.load(timed_page_load("/review", _header_people_review), outputs=[hdr])
         app.load(

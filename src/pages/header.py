@@ -13,16 +13,16 @@ timing_logger = logging.getLogger("uvicorn.error")
 LOGO_URL = "/images/The-list-logo2.png"
 FAVICON_URL = "/images/The-list-logo2.png"
 _SECTION_ORDER: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("Recipes", ("the-list", "the-list-review")),
-    ("Management", ("privileges",)),
-    ("Administration", ("admin",)),
+    ("Recetas", ("the-list", "the-list-review")),
+    ("Gestión", ("privileges",)),
+    ("Administración", ("admin",)),
 )
 _LABEL_OVERRIDES = {
     "the-list": "Recetas",
-    "the-list-review": "Review",
-    "admin": "Administration",
+    "the-list-review": "Revisión",
+    "admin": "Administración",
 }
-_DEFAULT_SECTION = "Other"
+_DEFAULT_SECTION = "Otros"
 
 
 def _log_timing(event_name: str, start: float, **fields: object) -> None:
@@ -97,7 +97,7 @@ FAVICON_SCRIPT = """
   };
 
   const applyTitle = () => {
-    document.title = 'Recetas Control Center';
+    document.title = 'Centro de control de recetas';
   };
 
   applyIcon();
@@ -466,7 +466,7 @@ def _header_html(user: Optional[dict], path: str, request: Any) -> str:
     _log_timing("header_html.resolve_active_route", step_start, active_key=active_key)
 
     if user:
-        name  = html.escape(user.get("name") or user.get("email") or "Signed in")
+        name  = html.escape(user.get("name") or user.get("email") or "Sesión iniciada")
         email = html.escape(user.get("email") or "")
         photo = (user.get("picture") or "").strip()
         initial = html.escape((user.get("name") or user.get("email") or "?")[0].upper())
@@ -487,13 +487,13 @@ def _header_html(user: Optional[dict], path: str, request: Any) -> str:
     <span class="account-caret" aria-hidden="true"></span>
   </summary>
   <div class="account-dropdown" role="menu">
-    <a href="/logout" role="menuitem" class="menu-link">Sign out</a>
+    <a href="/logout" role="menuitem" class="menu-link">Cerrar sesión</a>
   </div>
 </details>""".strip()
     else:
         #This is literally the svg code for the google button
         google_btn = """
-            <a href="/auth/google" class="google-btn-pill" aria-label="Sign in with Google">
+            <a href="/auth/google" class="google-btn-pill" aria-label="Iniciar sesión con Google">
               <span class="google-icon-wrapper">
                 <svg class="google-icon" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" role="img" aria-hidden="true">
                   <path fill="#4285F4" d="M17.64 9.2045c0-.638-.0573-1.2518-.1636-1.836H9v3.4763h4.844c-.208 1.125-.842 2.0777-1.795 2.7156v2.258h2.896c1.696-1.561 2.665-3.86 2.665-6.6139z"/>
@@ -502,14 +502,14 @@ def _header_html(user: Optional[dict], path: str, request: Any) -> str:
                   <path fill="#EA4335" d="M9 3.579c1.32 0 2.508.451 3.44 1.337l2.582-2.583C13.462.917 11.425 0 9 0 5.481 0 2.423 2.02.945 4.965l3.005 2.336C4.659 5.167 6.649 3.579 9 3.579z"/>
                 </svg>
               </span>
-              <span class="btn-text">Sign in with Google</span>
+              <span class="btn-text">Iniciar sesión con Google</span>
             </a>
             """.strip()
         account_html = google_btn
 
     # Left-side: site logo and navigation links
     logo_html = (
-        '<a href="/" class="site-logo" aria-label="Home">'
+        '<a href="/" class="site-logo" aria-label="Inicio">'
         f'<img src="{LOGO_URL}" class="logo-img" alt="Recetas" />'
         '<span class="logo-text">Recetas</span>'
         '</a>'
@@ -577,7 +577,7 @@ def _header_html(user: Optional[dict], path: str, request: Any) -> str:
     html_value = f"""{css_block}
 <input type="checkbox" id="sidebar-toggle" class="sidebar-toggle-input" />
 <input type="checkbox" id="sidebar-collapse" class="sidebar-collapse-input" />
-<label for="sidebar-toggle" class="sidebar-toggle-btn" aria-label="Open menu">
+<label for="sidebar-toggle" class="sidebar-toggle-btn" aria-label="Abrir menú">
   <span class="sidebar-toggle-icon" aria-hidden="true"></span>
 </label>
 <div class="hdr-wrap hdr-wrap--sidebar" data-nav="sidebar" id="sidebar">
@@ -585,15 +585,15 @@ def _header_html(user: Optional[dict], path: str, request: Any) -> str:
     <div class="sidebar-top">
       {logo_html}
       <div class="sidebar-top-actions">
-        <label for="sidebar-collapse" class="sidebar-collapse-btn" aria-label="Toggle sidebar" title="Toggle sidebar">
+        <label for="sidebar-collapse" class="sidebar-collapse-btn" aria-label="Alternar barra lateral" title="Alternar barra lateral">
           <span class="collapse-icon" aria-hidden="true"></span>
         </label>
-        <label for="sidebar-toggle" class="sidebar-close-btn" aria-label="Close menu">
+        <label for="sidebar-toggle" class="sidebar-close-btn" aria-label="Cerrar menú">
           <span aria-hidden="true"></span>
         </label>
       </div>
     </div>
-    <nav class="sidebar-nav" aria-label="Main navigation">
+    <nav class="sidebar-nav" aria-label="Navegación principal">
       {nav_markup}
     </nav>
     <div class="sidebar-footer">

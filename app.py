@@ -58,14 +58,15 @@ import os
 import mimetypes
 import gradio as gr
 
+os.environ.setdefault("RECETAS_BUCKET_NAME", "recetas-bucket")
+
 from src.login_logic import register_oauth_provider, add_login_snippet_route
 from src.pages.ui_login import make_login_page
 from src.mount_gradio_app import mount_gradio_app
-from src.pages.admin.app_admin import make_admin_app
 from src.pages.recetas_list.app_the_list import make_the_list_app
 from src.pages.recetas_display.app_people_display import make_people_display_app
 from src.pages.privileges.app_privileges import make_privileges_app
-from src.pages.review_display.app_review_display import make_review_display_app
+
 from src.gcs_storage import blob_http_metadata, download_bytes
 
 app = FastAPI()
@@ -73,6 +74,22 @@ _install_proxy_headers(app)
 
 MEDIA_CACHE_CONTROL_REVALIDATE = "public, max-age=0, must-revalidate"
 MEDIA_CACHE_CONTROL_VERSIONED = "public, max-age=31536000, immutable"
+
+
+def _make_bucket_notice_app(path: str, title: str, heading: str, message: str) -> gr.Blocks:
+    from src.pages.header import render_header
+
+    with gr.Blocks(title=title) as app_notice:
+        hdr = gr.HTML()
+
+        def _render_notice_header(request: gr.Request):
+            return render_header(path=path, request=request)
+
+        app_notice.load(_render_notice_header, outputs=[hdr])
+        with gr.Column():
+            gr.Markdown(f"## {heading}")
+            gr.Markdown(message)
+    return app_notice
 
 
 def _quote_etag(raw_etag: str | None) -> str:
@@ -272,10 +289,27 @@ async def media_blob(blob_path: str, request: Request) -> Response:
 # --- Simple pages
 the_list_app   = make_the_list_app()
 people_display_app = make_people_display_app()
-review_display_app = make_review_display_app()
-admin_app      = make_admin_app()
 privileges_app = make_privileges_app()
 login_page     = make_login_page()
+
+review_display_app = _make_bucket_notice_app(
+    path="/review",
+    title="Revisión de Recetas",
+    heading="Revisión no disponible",
+    message=(
+        "Esta instancia está en modo bucket (`recetas-bucket`) y no usa Cloud SQL. "
+        "El flujo de revisión SQL está deshabilitado."
+    ),
+)
+admin_app = _make_bucket_notice_app(
+    path="/admin",
+    title="Administración de Recetas",
+    heading="Administración SQL deshabilitada",
+    message=(
+        "Esta instancia funciona solo con bucket (`recetas-bucket`). "
+        "El explorador de tablas SQL no está disponible."
+    ),
+)
 
 # Optional: session secret via secret manager (fallback default set in bootstrap)
 session_secret = get_secret("SESSION_SECRET", default="dev-session-secret")

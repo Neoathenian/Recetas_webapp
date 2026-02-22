@@ -170,7 +170,7 @@
       header.style.gap = "8px";
 
       const title = document.createElement("strong");
-      title.textContent = "Crop Debug";
+      title.textContent = "Depuración de recorte";
 
       cropDebugPanelStatus = document.createElement("span");
       cropDebugPanelStatus.style.opacity = "0.8";
@@ -182,7 +182,7 @@
 
       const clearBtn = document.createElement("button");
       clearBtn.type = "button";
-      clearBtn.textContent = "Clear";
+      clearBtn.textContent = "Limpiar";
       clearBtn.style.border = "1px solid #475569";
       clearBtn.style.background = "#1e293b";
       clearBtn.style.color = "#e2e8f0";
@@ -252,7 +252,7 @@
   const fileToDataUrl = (file) =>
     new Promise((resolve, reject) => {
       if (!(file instanceof Blob)) {
-        reject(new Error("Invalid file payload."));
+        reject(new Error("El archivo recibido no es válido."));
         return;
       }
       const reader = new FileReader();
@@ -260,7 +260,7 @@
         resolve(String(reader.result || ""));
       };
       reader.onerror = () => {
-        reject(new Error("Could not encode cropped image."));
+        reject(new Error("No se pudo codificar la imagen recortada."));
       };
       reader.readAsDataURL(file);
     });
@@ -696,7 +696,7 @@
       const parsedBody = splitDefinitionBody(payload);
       const target = normalizeCitationPreview(parsedBody.target || "");
       const label = normalizeCitationPreview(parsedBody.label || "");
-      const preview = label || target || `Reference ${parsedNumber}`;
+      const preview = label || target || `Referencia ${parsedNumber}`;
       seenNumbers.add(parsedNumber);
       definitions.push({
         type: "number",
@@ -908,8 +908,8 @@
     title,
     options,
     getOptionLabel,
-    searchPlaceholder = "Search...",
-    confirmLabel = "Select",
+    searchPlaceholder = "Buscar...",
+    confirmLabel = "Seleccionar",
   }) =>
     new Promise((resolve) => {
       const source = Array.isArray(options) ? options : [];
@@ -944,7 +944,7 @@
       dialog.style.padding = "0.85rem";
 
       const heading = document.createElement("h3");
-      heading.textContent = String(title || "Select");
+      heading.textContent = String(title || "Seleccionar");
       heading.style.margin = "0";
       heading.style.fontSize = "1.03rem";
       heading.style.color = "#0f172a";
@@ -972,7 +972,7 @@
 
       const cancelBtn = document.createElement("button");
       cancelBtn.type = "button";
-      cancelBtn.textContent = "Cancel";
+      cancelBtn.textContent = "Cancelar";
       cancelBtn.style.border = "1px solid #cbd5e1";
       cancelBtn.style.background = "#ffffff";
       cancelBtn.style.borderRadius = "9px";
@@ -1025,7 +1025,7 @@
         }
         const emptyNode = document.createElement("option");
         emptyNode.value = "";
-        emptyNode.textContent = "No matches.";
+        emptyNode.textContent = "Sin coincidencias.";
         emptyNode.disabled = true;
         select.appendChild(emptyNode);
       };
@@ -1085,16 +1085,16 @@
     const existingKeys = new Set(existingEntries.map((entry) => entry.key));
 
     const mode = await openSelectionDialog({
-      title: "Create bibliography entry",
+      title: "Crear entrada bibliográfica",
       options: [
-        { id: "source", label: "Internal source (from Sources list)" },
-        { id: "theory", label: "Internal theory (from Theories list)" },
-        { id: "url", label: "External URL" },
-        { id: "text", label: "Manual text reference" },
+        { id: "source", label: "Fuente interna (de la lista de fuentes)" },
+        { id: "theory", label: "Teoría interna (de la lista de teorías)" },
+        { id: "url", label: "URL externa" },
+        { id: "text", label: "Referencia de texto manual" },
       ],
       getOptionLabel: (entry) => entry.label,
-      searchPlaceholder: "Filter mode...",
-      confirmLabel: "Continue",
+      searchPlaceholder: "Filtrar modo...",
+      confirmLabel: "Continuar",
     });
     if (!mode || !mode.id) return null;
 
@@ -1105,38 +1105,38 @@
       );
       if (!sourceOptions.length) {
         if (referenceKind === "theory") {
-          window.alert("No theory cards found. Create one in Theories first, or use URL/Text mode.");
+          window.alert("No se encontraron tarjetas de teoría. Crea una en Teorías o usa el modo URL/Texto.");
         } else {
-          window.alert("No source cards found. Create one in Sources first, or use URL/Text mode.");
+          window.alert("No se encontraron tarjetas de fuente. Crea una en Fuentes o usa el modo URL/Texto.");
         }
         return null;
       }
       const selectedSource = await openSelectionDialog({
-        title: referenceKind === "theory" ? "Select theory card" : "Select source card",
+        title: referenceKind === "theory" ? "Seleccionar tarjeta de teoría" : "Seleccionar tarjeta de fuente",
         options: sourceOptions,
         getOptionLabel: (entry) => `${entry.name || entry.slug} (${entry.slug})`,
         searchPlaceholder:
           referenceKind === "theory"
-            ? "Search theory by name or slug..."
-            : "Search source by name or slug...",
-        confirmLabel: referenceKind === "theory" ? "Use theory" : "Use source",
+            ? "Buscar teoría por nombre o slug..."
+            : "Buscar fuente por nombre o slug...",
+        confirmLabel: referenceKind === "theory" ? "Usar teoría" : "Usar fuente",
       });
       if (!selectedSource || !selectedSource.slug) return null;
 
       const labelInput = window.prompt(
         referenceKind === "theory"
-          ? "Optional label (leave empty to use theory name)."
-          : "Optional label (leave empty to use source name).",
+          ? "Etiqueta opcional (déjalo vacío para usar el nombre de la teoría)."
+          : "Etiqueta opcional (déjalo vacío para usar el nombre de la fuente).",
         String(selectedSource.name || ""),
       );
       if (labelInput === null) return null;
       const label = String(labelInput || "").trim();
       const suggestedKey = suggestCitationKey(selectedSource.slug || label || "ref", existingKeys);
-      const keyInput = window.prompt("Citation key for \\cite{key}:", suggestedKey);
+      const keyInput = window.prompt("Clave de cita para \\cite{clave}:", suggestedKey);
       if (keyInput === null) return null;
       const key = normalizeCitationKey(keyInput);
       if (!key) {
-        window.alert("Citation key must contain letters or numbers.");
+        window.alert("La clave de cita debe contener letras o números.");
         return null;
       }
       return {
@@ -1149,40 +1149,40 @@
     }
 
     if (mode.id === "url") {
-      const urlInput = window.prompt("Reference URL (https://...):", "");
+      const urlInput = window.prompt("URL de referencia (https://...):", "");
       if (urlInput === null) return null;
       const target = String(urlInput || "").trim();
       if (!/^https?:\/\//i.test(target)) {
-        window.alert("Enter a valid http(s) URL.");
+        window.alert("Introduce una URL http(s) válida.");
         return null;
       }
-      const labelInput = window.prompt("Optional label (example: Wikipedia):", "");
+      const labelInput = window.prompt("Etiqueta opcional (ejemplo: Wikipedia):", "");
       if (labelInput === null) return null;
       const label = String(labelInput || "").trim();
       const suggestedKey = suggestCitationKey(label || target, existingKeys);
-      const keyInput = window.prompt("Citation key for \\cite{key}:", suggestedKey);
+      const keyInput = window.prompt("Clave de cita para \\cite{clave}:", suggestedKey);
       if (keyInput === null) return null;
       const key = normalizeCitationKey(keyInput);
       if (!key) {
-        window.alert("Citation key must contain letters or numbers.");
+        window.alert("La clave de cita debe contener letras o números.");
         return null;
       }
       return { key, target, label };
     }
 
-    const textInput = window.prompt("Reference text (example: Interview notes, 2025):", "");
+    const textInput = window.prompt("Texto de referencia (ejemplo: notas de entrevista, 2025):", "");
     if (textInput === null) return null;
     const target = String(textInput || "").trim();
     if (!target) {
-      window.alert("Reference text cannot be empty.");
+      window.alert("El texto de referencia no puede estar vacío.");
       return null;
     }
     const suggestedKey = suggestCitationKey(target, existingKeys);
-    const keyInput = window.prompt("Citation key for \\cite{key}:", suggestedKey);
+    const keyInput = window.prompt("Clave de cita para \\cite{clave}:", suggestedKey);
     if (keyInput === null) return null;
     const key = normalizeCitationKey(keyInput);
     if (!key) {
-      window.alert("Citation key must contain letters or numbers.");
+      window.alert("La clave de cita debe contener letras o números.");
       return null;
     }
     return { key, target, label: "" };
@@ -1215,7 +1215,7 @@
         lastCompiledPreviewMarkdown = "";
         scheduleCompiledPreviewRerender({ immediate: true, preserveSelection: false });
       }
-      showSuccessToast(`Saved \\bib{${bibliographyEntry.key}}.`);
+      showSuccessToast(`Guardado \\bib{${bibliographyEntry.key}}.`);
     };
 
     buttonHost.addEventListener("pointerdown", (event) => {
@@ -1261,7 +1261,7 @@
         title: "Insert citation",
         options: selectableEntries,
         getOptionLabel: (entry) => `${entry.marker} - ${entry.preview}`,
-        searchPlaceholder: "Search citation...",
+        searchPlaceholder: "Buscar cita...",
         confirmLabel: "Insert",
       });
       if (!selectedEntry || !selectedEntry.marker) return;
@@ -1274,7 +1274,7 @@
         insertCitationMarkerIntoPreview(marker, preferredPreviewRange) ||
         (textarea instanceof HTMLTextAreaElement && appendTextToTextarea(textarea, marker));
       if (!insertedAtCursor) {
-        window.alert("Could not insert citation marker.");
+        window.alert("No se pudo insertar el marcador de cita.");
         return;
       }
 
@@ -1746,17 +1746,17 @@
     const input = document.createElement("input");
     input.type = "text";
     input.className = "person-detail-card__tag-add-input";
-    input.placeholder = `new ${chipLabel}`;
+    input.placeholder = `nuevo ${chipLabel}`;
     input.autocomplete = "off";
-    input.setAttribute("aria-label", `New ${chipLabel}`);
+    input.setAttribute("aria-label", `Nuevo ${chipLabel}`);
     editor.appendChild(input);
 
     const cancelButton = document.createElement("button");
     cancelButton.type = "button";
     cancelButton.className = "person-detail-card__tag-add-cancel-btn";
     cancelButton.textContent = "x";
-    cancelButton.title = `Cancel ${chipLabel} add`;
-    cancelButton.setAttribute("aria-label", `Cancel ${chipLabel} add`);
+    cancelButton.title = `Cancelar añadir ${chipLabel}`;
+    cancelButton.setAttribute("aria-label", `Cancelar añadir ${chipLabel}`);
     editor.appendChild(cancelButton);
 
     const suggestions = document.createElement("div");
@@ -1795,7 +1795,7 @@
         optionButton.type = "button";
         optionButton.className = "person-detail-card__tag-suggestion-btn";
         optionButton.textContent = tag;
-        optionButton.setAttribute("aria-label", `Use ${chipLabel} ${tag}`);
+        optionButton.setAttribute("aria-label", `Usar ${chipLabel} ${tag}`);
         optionButton.addEventListener("mousedown", (event) => {
           event.preventDefault();
         });
@@ -1861,8 +1861,8 @@
     button.type = "button";
     button.className = "person-detail-card__tags-add-btn";
     button.textContent = "+";
-    button.title = `Add ${chipLabel}`;
-    button.setAttribute("aria-label", `Add ${chipLabel}`);
+    button.title = `Añadir ${chipLabel}`;
+    button.setAttribute("aria-label", `Añadir ${chipLabel}`);
     let swallowNextClick = false;
 
     const activate = (event) => {
@@ -2247,7 +2247,7 @@
     try {
       const croppedFile = await buildCroppedCardImageFile();
       if (!(croppedFile instanceof File)) {
-        throw new Error("Could not create cropped image.");
+        throw new Error("No se pudo crear la imagen recortada.");
       }
       const croppedDataUrl = await fileToDataUrl(croppedFile);
       setComponentValue(CARD_PROPOSAL_IMAGE_DATA_ID, croppedDataUrl);
@@ -2298,7 +2298,7 @@
     new Promise((resolve, reject) => {
       const image = new Image();
       image.onload = () => resolve(image);
-      image.onerror = () => reject(new Error("Image could not be loaded for cropping."));
+      image.onerror = () => reject(new Error("No se pudo cargar la imagen para recortarla."));
       image.src = objectUrl;
     });
 
@@ -2314,11 +2314,11 @@
     modal.className = "the-list-card-image-crop-modal";
     modal.hidden = true;
     modal.innerHTML = `
-      <button type="button" class="the-list-card-image-crop-modal__backdrop" data-action="backdrop" aria-label="Crop popup background"></button>
+      <button type="button" class="the-list-card-image-crop-modal__backdrop" data-action="backdrop" aria-label="Fondo del cuadro de recorte"></button>
       <section class="the-list-card-image-crop-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="the-list-card-image-crop-title">
         <header class="the-list-card-image-crop-modal__header">
-          <h3 id="the-list-card-image-crop-title">Crop card image</h3>
-          <button type="button" class="the-list-card-image-crop-modal__close" data-action="cancel" aria-label="Close crop popup">x</button>
+          <h3 id="the-list-card-image-crop-title">Recortar imagen de la tarjeta</h3>
+          <button type="button" class="the-list-card-image-crop-modal__close" data-action="cancel" aria-label="Cerrar cuadro de recorte">x</button>
         </header>
         <div class="the-list-card-image-crop-modal__body">
           <div class="the-list-card-image-crop-modal__viewport">
@@ -2326,10 +2326,10 @@
               class="the-list-card-image-crop-modal__canvas"
               width="${CARD_IMAGE_CROP_VIEW_WIDTH}"
               height="${CARD_IMAGE_CROP_VIEW_HEIGHT}"
-              aria-label="4:3 crop preview"
+              aria-label="Vista previa de recorte 4:3"
             ></canvas>
           </div>
-          <p class="the-list-card-image-crop-modal__hint">Drag to move. Scroll to zoom.</p>
+          <p class="the-list-card-image-crop-modal__hint">Arrastra para mover. Desplázate para acercar.</p>
           <div class="the-list-card-image-crop-modal__controls">
             <label for="the-list-card-image-crop-zoom">Zoom</label>
             <input
@@ -2342,12 +2342,12 @@
               value="0"
             />
             <span class="the-list-card-image-crop-modal__zoom-value">100%</span>
-            <span class="the-list-card-image-crop-modal__output">Output: ${CARD_IMAGE_OUTPUT_WIDTH} x ${CARD_IMAGE_OUTPUT_HEIGHT}</span>
+            <span class="the-list-card-image-crop-modal__output">Salida: ${CARD_IMAGE_OUTPUT_WIDTH} x ${CARD_IMAGE_OUTPUT_HEIGHT}</span>
           </div>
         </div>
         <div class="the-list-card-image-crop-modal__actions">
-          <button type="button" class="the-list-card-image-crop-modal__btn the-list-card-image-crop-modal__btn--secondary" data-action="cancel">Cancel</button>
-          <button type="button" class="the-list-card-image-crop-modal__btn the-list-card-image-crop-modal__btn--primary" data-action="apply">Apply crop</button>
+          <button type="button" class="the-list-card-image-crop-modal__btn the-list-card-image-crop-modal__btn--secondary" data-action="cancel">Cancelar</button>
+          <button type="button" class="the-list-card-image-crop-modal__btn the-list-card-image-crop-modal__btn--primary" data-action="apply">Aplicar recorte</button>
         </div>
       </section>
     `;
@@ -2568,7 +2568,7 @@
     if (active) {
       media.setAttribute("role", "button");
       media.setAttribute("tabindex", "0");
-      media.setAttribute("aria-label", "Change card image");
+      media.setAttribute("aria-label", "Cambiar imagen de la tarjeta");
       return;
     }
     media.removeAttribute("role");
@@ -2935,29 +2935,29 @@
     const dragHandle = document.createElement("button");
     dragHandle.type = "button";
     dragHandle.className = "recipe-ingredient-item__drag";
-    dragHandle.title = "Drag to reorder ingredient";
-    dragHandle.setAttribute("aria-label", "Drag to reorder ingredient");
+    dragHandle.title = "Arrastrar para reordenar ingrediente";
+    dragHandle.setAttribute("aria-label", "Arrastrar para reordenar ingrediente");
     dragHandle.textContent = "";
 
     const amountInput = document.createElement("input");
     amountInput.type = "text";
     amountInput.className = "recipe-ingredient-item__amount";
     amountInput.value = normalizeRecipeIngredientPart(initialRow.amount);
-    amountInput.placeholder = "amount";
-    amountInput.setAttribute("aria-label", "Ingredient amount");
+    amountInput.placeholder = "cantidad";
+    amountInput.setAttribute("aria-label", "Cantidad del ingrediente");
 
     const ingredientInput = document.createElement("input");
     ingredientInput.type = "text";
     ingredientInput.className = "recipe-ingredient-item__name";
     ingredientInput.value = normalizeRecipeIngredientPart(initialRow.ingredient);
-    ingredientInput.placeholder = "ingredient";
-    ingredientInput.setAttribute("aria-label", "Ingredient name");
+    ingredientInput.placeholder = "ingrediente";
+    ingredientInput.setAttribute("aria-label", "Nombre del ingrediente");
 
     const removeButton = document.createElement("button");
     removeButton.type = "button";
     removeButton.className = "recipe-ingredient-item__remove";
-    removeButton.title = "Delete ingredient row";
-    removeButton.setAttribute("aria-label", "Delete ingredient row");
+    removeButton.title = "Eliminar fila de ingrediente";
+    removeButton.setAttribute("aria-label", "Eliminar fila de ingrediente");
     removeButton.textContent = "x";
 
     item.appendChild(dragHandle);
@@ -3108,8 +3108,8 @@
       const addButton = document.createElement("button");
       addButton.type = "button";
       addButton.className = "recipe-ingredients-editor__add-btn";
-      addButton.title = "Add ingredient row";
-      addButton.setAttribute("aria-label", "Add ingredient row");
+      addButton.title = "Añadir fila de ingrediente";
+      addButton.setAttribute("aria-label", "Añadir fila de ingrediente");
       addButton.textContent = "+";
 
       const columns = document.createElement("div");
@@ -3238,8 +3238,8 @@
     const dragHandle = document.createElement("button");
     dragHandle.type = "button";
     dragHandle.className = "recipe-step-item__drag";
-    dragHandle.title = "Drag to reorder step";
-    dragHandle.setAttribute("aria-label", "Drag to reorder step");
+    dragHandle.title = "Arrastrar para reordenar paso";
+    dragHandle.setAttribute("aria-label", "Arrastrar para reordenar paso");
     dragHandle.textContent = "";
 
     const indexNode = document.createElement("span");
@@ -3250,14 +3250,14 @@
     input.type = "text";
     input.className = "recipe-step-item__input";
     input.value = normalizeRecipeStepValue(initialValue);
-    input.placeholder = "Describe this step...";
-    input.setAttribute("aria-label", "Preparation step");
+    input.placeholder = "Describe este paso...";
+    input.setAttribute("aria-label", "Paso de preparación");
 
     const removeButton = document.createElement("button");
     removeButton.type = "button";
     removeButton.className = "recipe-step-item__remove";
-    removeButton.title = "Delete step";
-    removeButton.setAttribute("aria-label", "Delete step");
+    removeButton.title = "Eliminar paso";
+    removeButton.setAttribute("aria-label", "Eliminar paso");
     removeButton.textContent = "x";
 
     item.appendChild(dragHandle);
@@ -3402,8 +3402,8 @@
       const addButton = document.createElement("button");
       addButton.type = "button";
       addButton.className = "recipe-steps-editor__add-btn";
-      addButton.title = "Add step";
-      addButton.setAttribute("aria-label", "Add step");
+      addButton.title = "Añadir paso";
+      addButton.setAttribute("aria-label", "Añadir paso");
       addButton.textContent = "+";
 
       header.appendChild(title);

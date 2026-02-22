@@ -8,9 +8,14 @@ from pathlib import Path
 from typing import Dict, List, Sequence, Tuple
 
 import gradio as gr
-from sqlalchemy import text
 
-from src.db import session_scope
+from src.bucket_identity_store import (
+    PRIVILEGE_FIELDS as BUCKET_PRIVILEGE_FIELDS,
+    get_user_privileges,
+    list_users_with_privileges,
+    set_user_active,
+    set_user_privilege,
+)
 from src.login_logic import get_user
 from src.pages.header import render_header, with_light_mode_head
 from src.page_timing import timed_page_load
@@ -20,76 +25,15 @@ ASSETS_DIR = Path(__file__).resolve().parent
 CSS_DIR = ASSETS_DIR / "css"
 JS_DIR = ASSETS_DIR / "js"
 
-PRIVILEGE_FIELDS: Sequence[str] = ("base_user", "reviewer", "editor", "admin", "creator")
+PRIVILEGE_FIELDS: Sequence[str] = tuple(BUCKET_PRIVILEGE_FIELDS)
 PRIVILEGE_LABELS: Dict[str, str] = {
-    "base_user": "Base User",
-    "reviewer": "Reviewer",
+    "base_user": "Usuario base",
+    "reviewer": "Revisor",
     "editor": "Editor",
-    "admin": "Admin",
-    "creator": "Creator",
+    "admin": "Administrador",
+    "creator": "Creador",
 }
 TRUE_VALUES = {"1", "true", "yes", "on"}
-
-_PRIVILEGE_QUERY = text(
-    """
-    SELECT
-        u.id,
-        u.name,
-        u.username,
-        u.email,
-        u.is_active,
-        COALESCE(p.base_user, FALSE)        AS base_user,
-        COALESCE(p.reviewer, FALSE)         AS reviewer,
-        COALESCE((to_jsonb(p) ->> 'editor')::boolean, FALSE) AS editor,
-        COALESCE(
-            (to_jsonb(p) ->> 'admin')::boolean,
-            FALSE
-        ) AS admin,
-        COALESCE((to_jsonb(p) ->> 'creator')::boolean, FALSE) AS creator
-    FROM app."user" u
-    LEFT JOIN app.user_privileges p
-        ON lower(p.email) = lower(u.email)
-    ORDER BY u.name
-    """
-)
-
-
-def _ensure_privilege_columns(session) -> None:
-    session.execute(
-        text(
-            """
-            ALTER TABLE app.user_privileges
-            ADD COLUMN IF NOT EXISTS editor BOOLEAN NOT NULL DEFAULT FALSE
-            """
-        )
-    )
-    session.execute(
-        text(
-            """
-            ALTER TABLE app.user_privileges
-            ADD COLUMN IF NOT EXISTS admin BOOLEAN NOT NULL DEFAULT FALSE
-            """
-        )
-    )
-    session.execute(
-        text(
-            """
-            ALTER TABLE app.user_privileges
-            ADD COLUMN IF NOT EXISTS creator BOOLEAN NOT NULL DEFAULT FALSE
-            """
-        )
-    )
-    session.execute(
-        text(
-            """
-            UPDATE app.user_privileges AS p
-            SET admin = TRUE
-            WHERE p.admin = FALSE
-              AND COALESCE((to_jsonb(p) ->> 'reviewer_creator')::boolean, FALSE)
-            """
-        )
-    )
-
 
 def _read_asset(path: Path) -> str:
     try:
@@ -147,23 +91,20 @@ def _visible_privilege_fields(can_manage_creator: bool) -> tuple[str, ...]:
 
 
 def _fetch_privilege_rows() -> List[Dict[str, object]]:
-    with session_scope() as session:
-        _ensure_privilege_columns(session)
-        rows = session.execute(_PRIVILEGE_QUERY).mappings().all()
-    return [dict(row) for row in rows]
+    return [dict(row) for row in list_users_with_privileges()]
 
 
 def _summary_for_rows(rows: Sequence[Dict[str, object]]) -> str:
     count = len(rows)
     suffix = "" if count == 1 else "s"
-    return f"{count} user{suffix} listed."
+    return f"{count} usuario{suffix} listado{suffix}."
 
 
 def _render_privilege_button(email: str | None, privilege: str, enabled: bool) -> str:
     safe_privilege = html.escape(privilege, quote=True)
     email_value = (email or "").strip()
     email_attr = html.escape(email_value, quote=True)
-    label = "TRUE" if enabled else "FALSE"
+    label = "SÍ" if enabled else "NO"
     state_attr = "true" if enabled else "false"
     classes = ["priv-flag", f"is-{state_attr}"]
     disabled_attr = ""
@@ -187,12 +128,12 @@ def _render_privilege_button(email: str | None, privilege: str, enabled: bool) -
 
 def _render_active_toggle(row_id: object, is_active: bool, email: str | None) -> str:
     if row_id in (None, ""):
-        return "<span class='priv-missing'>No ID</span>"
+        return "<span class='priv-missing'>Sin ID</span>"
     email_attr = html.escape((email or "").strip(), quote=True)
     state_attr = "true" if is_active else "false"
     state_class = "is-on" if is_active else "is-off"
     icon = "✓" if is_active else "✕"
-    label = "Active" if is_active else "Inactive"
+    label = "Activo" if is_active else "Inactivo"
     return (
         "<button type='button' class='priv-active-toggle {cls}' data-row-id='{row}' "
         "data-state='{state}' data-email='{email}' aria-pressed='{state}'>"
@@ -210,7 +151,7 @@ def _render_active_toggle(row_id: object, is_active: bool, email: str | None) ->
 
 
 def _render_privileges_table(rows: Sequence[Dict[str, object]], *, visible_fields: Sequence[str]) -> str:
-    headers = ["Name", "Username", "Email", "Active"] + [PRIVILEGE_LABELS[key] for key in visible_fields]
+    headers = ["Nombre", "Usuario", "Correo", "Activo"] + [PRIVILEGE_LABELS[key] for key in visible_fields]
     header_cells = "".join(f"<th scope='col'>{html.escape(label)}</th>" for label in headers)
     body_rows: List[str] = []
     for row in rows:
@@ -220,14 +161,14 @@ def _render_privileges_table(rows: Sequence[Dict[str, object]], *, visible_field
         email_display = (
             html.escape(email)
             if email
-            else "<span class='priv-missing'>No email</span>"
+            else "<span class='priv-missing'>Sin correo</span>"
         )
         cells = [
             f"<td class='priv-col-name'><div class='priv-name'>{name or '—'}</div></td>",
             f"<td class='priv-col-username'>{username or '—'}</td>",
             f"<td class='priv-col-email'>{email_display}</td>",
             "<td class='priv-col-active'>{button}</td>".format(
-                button=_render_active_toggle(row.get("id"), bool(row.get("is_active")), row.get("email"))
+                button=_render_active_toggle(row.get("email") or row.get("id"), bool(row.get("is_active")), row.get("email"))
             ),
         ]
         for key in visible_fields:
@@ -241,7 +182,7 @@ def _render_privileges_table(rows: Sequence[Dict[str, object]], *, visible_field
 
     if not body_rows:
         body_rows.append(
-            "<tr class='priv-empty'><td colspan='{cols}'>No users registered.</td></tr>".format(
+            "<tr class='priv-empty'><td colspan='{cols}'>No hay usuarios registrados.</td></tr>".format(
                 cols=4 + len(visible_fields)
             )
         )
@@ -267,161 +208,45 @@ def _load_table_payload(*, can_manage_creator: bool) -> Tuple[str, str]:
     return html_table, summary
 
 
-def _upsert_privileges(session, email: str, **flags: bool) -> None:
-    email_value = (email or "").strip()
+def _set_user_active_state(email: str, is_active: bool, *, can_manage_creator: bool) -> str:
+    email_value = (email or "").strip().lower()
     if not email_value:
-        return
-    _ensure_privilege_columns(session)
-    filtered = {key: bool(value) for key, value in flags.items() if key in PRIVILEGE_FIELDS}
-    if not filtered:
-        return
-    assignments = [f'{col} = :{col}' for col in filtered]
-    params = {"email": email_value, **filtered}
-    insert_cols = ["email", *filtered.keys()]
-    insert_vals = [":email", *(f":{col}" for col in filtered)]
-    result = session.execute(
-        text(
-            f"""
-            UPDATE app.user_privileges
-            SET {', '.join(assignments)}
-            WHERE lower(email) = lower(:email)
-            """
-        ),
-        params,
-    )
-    if result.rowcount == 0:
-        session.execute(
-            text(
-                f"""
-                INSERT INTO app.user_privileges ({', '.join(insert_cols)})
-                VALUES ({', '.join(insert_vals)})
-                """
-            ),
-            params,
-        )
+        raise ValueError("Falta el correo del usuario.")
 
+    privileges = get_user_privileges(email_value)
+    if bool(privileges.get("creator")) and not can_manage_creator:
+        raise PermissionError("Solo un usuario creador puede modificar usuarios con privilegio de creador.")
 
-def _sync_user_state_from_privileges(session, email: str) -> None:
-    email_value = (email or "").strip()
-    if not email_value:
-        return
+    set_user_active(email_value, bool(is_active))
+    if not bool(is_active):
+        # Al desactivar, retiramos privilegios operativos.
+        set_user_privilege(email_value, "base_user", False)
+        set_user_privilege(email_value, "reviewer", False)
+        set_user_privilege(email_value, "editor", False)
+        set_user_privilege(email_value, "admin", False)
+        if can_manage_creator:
+            set_user_privilege(email_value, "creator", False)
 
-    priv_row = session.execute(
-        text(
-            """
-            SELECT
-                p.base_user,
-                p.reviewer,
-                COALESCE((to_jsonb(p) ->> 'editor')::boolean, FALSE) AS editor,
-                COALESCE(
-                    (to_jsonb(p) ->> 'admin')::boolean,
-                    FALSE
-                ) AS admin,
-                COALESCE((to_jsonb(p) ->> 'creator')::boolean, FALSE) AS creator
-            FROM app.user_privileges p
-            WHERE lower(p.email) = lower(:email)
-            """
-        ),
-        {"email": email_value},
-    ).mappings().one_or_none()
-    if priv_row is None:
-        return
-
-    user_row = session.execute(
-        text(
-            """
-            SELECT id
-            FROM app."user"
-            WHERE lower(email) = lower(:email)
-            """
-        ),
-        {"email": email_value},
-    ).mappings().one_or_none()
-    if not user_row:
-        return
-
-    user_id = user_row["id"]
-    should_activate = any(bool(priv_row.get(key)) for key in PRIVILEGE_FIELDS)
-    session.execute(
-        text('UPDATE app."user" SET is_active = :state WHERE id = :user_id'),
-        {"state": should_activate, "user_id": user_id},
-    )
-
-
-def _set_user_active_state(user_id: int, is_active: bool, *, can_manage_creator: bool) -> str:
-    with session_scope() as session:
-        row = session.execute(
-            text(
-                """
-                SELECT
-                    u.name,
-                    u.email,
-                    COALESCE(
-                        (to_jsonb(p) ->> 'creator')::boolean,
-                        FALSE
-                    ) AS creator
-                FROM app."user"
-                u
-                LEFT JOIN app.user_privileges p
-                    ON lower(p.email) = lower(u.email)
-                WHERE u.id = :user_id
-                """
-            ),
-            {"user_id": user_id},
-        ).mappings().one_or_none()
-        if not row:
-            raise ValueError(f"User {user_id} not found.")
-        if bool(row.get("creator")) and not can_manage_creator:
-            raise PermissionError("Only a creator user can modify users with the creator privilege.")
-
-        email_value = (row.get("email") or "").strip()
-        session.execute(
-            text('UPDATE app."user" SET is_active = :state WHERE id = :user_id'),
-            {"state": is_active, "user_id": user_id},
-        )
-        if email_value:
-            if not is_active:
-                disable_flags = {
-                    "base_user": False,
-                    "reviewer": False,
-                    "editor": False,
-                    "admin": False,
-                }
-                if can_manage_creator:
-                    disable_flags["creator"] = False
-                _upsert_privileges(session, email_value, **disable_flags)
-        name = row.get("name") or user_id
-        state_label = "activated" if is_active else "deactivated"
-        return f"User {name} {state_label}"
+    state_label = "activado" if is_active else "desactivado"
+    return f"Usuario {email_value} {state_label}"
 
 
 def _apply_privilege_change(email: str, privilege: str, enabled: bool, *, can_manage_creator: bool) -> None:
     normalized = (privilege or "").strip().lower()
     if normalized not in PRIVILEGE_FIELDS:
-        raise ValueError(f"Unsupported privilege: {privilege}")
+        raise ValueError(f"Privilegio no compatible: {privilege}")
     if normalized == "creator" and not can_manage_creator:
-        raise PermissionError("Only a creator user can modify the creator privilege.")
+        raise PermissionError("Solo un usuario creador puede modificar el privilegio de creador.")
     email_value = (email or "").strip()
     if not email_value:
-        raise ValueError("The user has no registered email.")
-
-    stmt = text(
-        f"""
-        INSERT INTO app.user_privileges (email, "{normalized}")
-        VALUES (:email, :flag)
-        ON CONFLICT (email) DO UPDATE SET "{normalized}" = EXCLUDED."{normalized}"
-        """
-    )
-    with session_scope() as session:
-        _ensure_privilege_columns(session)
-        session.execute(stmt, {"email": email_value, "flag": bool(enabled)})
-        _sync_user_state_from_privileges(session, email_value)
+        raise ValueError("El usuario no tiene correo registrado.")
+    set_user_privilege(email_value, normalized, bool(enabled))
 
 
 def _handle_refresh(request: gr.Request):
     can_manage_privileges, can_manage_creator = _request_role_flags(request)
     if not can_manage_privileges:
-        return "", "❌ You do not have permission to manage privileges."
+        return "", "❌ No tienes permiso para gestionar privilegios."
     html_table, summary = _load_table_payload(can_manage_creator=can_manage_creator)
     return html_table, f"ℹ️ {summary}"
 
@@ -429,10 +254,10 @@ def _handle_refresh(request: gr.Request):
 def _handle_toggle(payload_json: str, request: gr.Request):
     can_manage_privileges, can_manage_creator = _request_role_flags(request)
     if not can_manage_privileges:
-        return "", "❌ You do not have permission to manage privileges."
+        return "", "❌ No tienes permiso para gestionar privilegios."
     if not payload_json:
         table_html, summary = _load_table_payload(can_manage_creator=can_manage_creator)
-        return table_html, f"⚠️ No changes were received. {summary}"
+        return table_html, f"⚠️ No se recibieron cambios. {summary}"
     try:
         payload = json.loads(payload_json)
         privilege = payload.get("privilege")
@@ -443,44 +268,46 @@ def _handle_toggle(payload_json: str, request: gr.Request):
         _apply_privilege_change(email, privilege, next_state, can_manage_creator=can_manage_creator)
         html_table, summary = _load_table_payload(can_manage_creator=can_manage_creator)
         normalized_privilege = (privilege or "").strip().lower()
-        label = PRIVILEGE_LABELS.get(normalized_privilege, normalized_privilege.title() or "Privilege")
-        state = "TRUE" if next_state else "FALSE"
-        return html_table, f"✅ {label} for {email} = {state}. {summary}"
+        label = PRIVILEGE_LABELS.get(normalized_privilege, normalized_privilege.title() or "Privilegio")
+        state = "SÍ" if next_state else "NO"
+        return html_table, f"✅ {label} para {email} = {state}. {summary}"
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to toggle privilege flag")
         html_table, summary = _load_table_payload(can_manage_creator=can_manage_creator)
-        return html_table, f"❌ Update failed: {exc}. {summary}"
+        return html_table, f"❌ La actualización falló: {exc}. {summary}"
 
 
 def _handle_active_toggle(payload_json: str, request: gr.Request):
     can_manage_privileges, can_manage_creator = _request_role_flags(request)
     if not can_manage_privileges:
-        return "", "❌ You do not have permission to manage privileges."
+        return "", "❌ No tienes permiso para gestionar privilegios."
     if not payload_json:
         table_html, summary = _load_table_payload(can_manage_creator=can_manage_creator)
-        return table_html, f"⚠️ No changes were received. {summary}"
+        return table_html, f"⚠️ No se recibieron cambios. {summary}"
     try:
         payload = json.loads(payload_json)
         row_id = payload.get("rowId")
+        email = (payload.get("email") or "").strip()
         next_state = payload.get("nextState")
-        if row_id in (None, ""):
-            raise ValueError("Missing user identifier.")
+        target_email = email or str(row_id or "").strip()
+        if not target_email:
+            raise ValueError("Falta el correo del usuario.")
         if next_state is None:
-            raise ValueError("Missing target state.")
-        message = _set_user_active_state(int(row_id), bool(next_state), can_manage_creator=can_manage_creator)
+            raise ValueError("Falta el estado de destino.")
+        message = _set_user_active_state(target_email, bool(next_state), can_manage_creator=can_manage_creator)
         html_table, summary = _load_table_payload(can_manage_creator=can_manage_creator)
         return html_table, f"✅ {message}. {summary}"
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to toggle user active state")
         html_table, summary = _load_table_payload(can_manage_creator=can_manage_creator)
-        return html_table, f"❌ Update failed: {exc}. {summary}"
+        return html_table, f"❌ La actualización falló: {exc}. {summary}"
 
 
 def make_privileges_app() -> gr.Blocks:
     stylesheet = _load_privileges_css()
     table_js = with_light_mode_head(_load_privileges_js())
     with gr.Blocks(
-        title="Privileges Console",
+        title="Consola de privilegios",
         css=stylesheet or None,
         head=table_js,
     ) as app:
@@ -488,7 +315,7 @@ def make_privileges_app() -> gr.Blocks:
         app.load(timed_page_load("/privileges", _header_privileges), outputs=[hdr])
 
         with gr.Column(elem_id="privileges-shell"):
-            gr.Markdown("## User Privileges", elem_id="privileges-title")
+            gr.Markdown("## Privilegios de usuario", elem_id="privileges-title")
             table_html = gr.HTML(elem_id="privileges-table")
             status_md = gr.Markdown("", elem_id="privileges-status")
 

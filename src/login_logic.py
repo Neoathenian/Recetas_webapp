@@ -2,19 +2,20 @@ from typing import Dict, Any, List, Optional
 
 import logging
 import os
+import re
 import time
 from urllib.parse import urlsplit, urlunsplit, urlencode, quote
 from fastapi.responses import HTMLResponse, JSONResponse
 from authlib.integrations.starlette_client import OAuth
-from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
 from starlette.requests import Request
 from starlette.requests import Request as StarletteRequest
 from starlette.responses import RedirectResponse
 
-from src.db import make_code, readonly_session_scope, session_scope
-from src.employees import ensure_user
+from src.bucket_identity_store import (
+    empty_privileges,
+    get_user_privileges,
+    upsert_user_record,
+)
 
 oauth = OAuth()
 timing_logger = logging.getLogger("uvicorn.error")
@@ -50,10 +51,15 @@ _LOGIN_BUTTON_TEMPLATE = """
 <div class="mt-login-wrapper" style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
   <a href="{login_url}" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.6rem 1rem;border-radius:6px;border:1px solid #d1d5db;background:#fff;color:#111827;font-weight:600;text-decoration:none;box-shadow:0 1px 2px rgba(0,0,0,0.12);">
     <span style="width:18px;height:18px;display:inline-block;"><svg viewBox="0 0 533.5 544.3" xmlns="http://www.w3.org/2000/svg"><path fill="#4285f4" d="M533.5 278.4c0-18-1.5-31.1-4.7-44.7H272.1v81.1h148.9c-3 20.5-19.4 51.4-55.9 72.1l-.5 3.2 81.2 62.4 5.6.6c51.8-47.6 81.1-117.9 81.1-174.7z"/><path fill="#34a853" d="M272.1 544.3c73.5 0 135.1-24.1 180.2-65.6l-86-66.1c-23 15.8-54 26.8-94.2 26.8-71.8 0-132.6-47.6-154.3-113.6l-3.2.3-84.2 64.9-1.1 3c44.9 89.2 137 150.3 242.8 150.3z"/><path fill="#fbbc05" d="M117.8 325.8c-5.4-16.4-8.5-34-8.5-52.2s3.1-35.8 8.2-52.2l-.1-3.5-85.4-65.8-2.8 1.3C10.3 196.2 0 231.9 0 273.6s10.3 77.4 29.2 120.1z"/><path fill="#ea4335" d="M272.1 107.7c51.2 0 85.7 22.2 105.4 40.8l77-75.1C406.4 28.7 345.6 0 272.1 0 166.3 0 74.2 61.1 29.2 150.3l88.7 69c21.7-66 82.5-111.6 154.2-111.6z"/></svg></span>
-    <span>Sign in with Google</span>
+    <span>Iniciar sesión con Google</span>
   </a>
 </div>
 """.strip()
+
+
+def make_code(value: str, default_prefix: str = "user") -> str:
+    normalized = re.sub(r"[^a-z0-9]+", "-", str(value or "").strip().lower()).strip("-")
+    return normalized or default_prefix
 
 
 def _log_timing(event_name: str, start: float, **fields: object) -> None:
@@ -223,7 +229,7 @@ def _store_refreshed_user_in_session(request: Any, user: Dict[str, Any]) -> None
 
 def _persist_user(userinfo: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Ensure the authenticated account has a corresponding row in app."user".
+    Ensure the authenticated account has a corresponding JSON record in bucket storage.
     Returns the user payload enriched with canonical identifiers and privileges.
     """
     user = dict(userinfo)
@@ -235,79 +241,48 @@ def _persist_user(userinfo: Dict[str, Any]) -> Dict[str, Any]:
         or user.get("sub")
         or user_id
     )
-    code = make_code((code_source or "").strip() or user_id, default_prefix="user")
+    code = make_code((code_source or "").strip() or user_id, default_prefix="usuario")
     display_name = (user.get("name") or "").strip() or user_id
     email = email or user_id
 
-    with session_scope() as session:
-        user_pk, email, stored_name = ensure_user(
-            session,
-            user_identifier=email or user_id,
-            display_name=display_name,
-        )
-        privileges = _lookup_user_privileges(session, email)
+    stored_user = upsert_user_record(
+        email=email or user_id,
+        display_name=display_name,
+        username=(user.get("username") or ""),
+        mark_login=True,
+    )
+    stored_email = str(stored_user.get("email") or email or user_id).strip().lower()
+    stored_name = str(stored_user.get("name") or display_name).strip() or display_name
+    stored_user_id = str(stored_user.get("user_id") or stored_email).strip() or stored_email
+    stored_user_code = str(stored_user.get("user_code") or code).strip() or code
+    privileges = _lookup_user_privileges(stored_email)
 
-    resolved_user_id = user_pk
-    user["user_id"] = resolved_user_id
-    user["user_code"] = code
+    user["user_id"] = stored_user_id
+    user["user_code"] = stored_user_code
 
     # Backward-compatible fields still used in parts of the codebase.
-    user["employee_id"] = resolved_user_id
-    user["employee_code"] = code
+    user["employee_id"] = stored_user_id
+    user["employee_code"] = stored_user_code
     user["name"] = stored_name or display_name
-    user["email"] = email
+    user["email"] = stored_email
     user["privileges"] = privileges
+    user["is_active"] = bool(stored_user.get("is_active", True))
     user[_PRIVILEGES_REFRESH_TS_KEY] = time.time()
     return user
 
 
-_SQL_PRIVILEGE_COLUMNS: tuple[str, ...] = ("base_user", "reviewer", "editor", "admin", "creator")
-_LOCAL_PRIVILEGE_COLUMNS: tuple[str, ...] = ()
-_PRIVILEGE_COLUMNS: tuple[str, ...] = _SQL_PRIVILEGE_COLUMNS
-
-
 def _empty_privileges() -> Dict[str, bool]:
-    return {name: False for name in _PRIVILEGE_COLUMNS}
+    return empty_privileges()
 
 
-def _lookup_user_privileges(session: Session, email: str) -> Dict[str, bool]:
+def _lookup_user_privileges(email: str) -> Dict[str, bool]:
     total_start = time.perf_counter()
-    normalized_email = (email or "").strip()
+    normalized_email = (email or "").strip().lower()
     privileges = _empty_privileges()
     if normalized_email:
         query_start = time.perf_counter()
-        try:
-            result = session.execute(
-                text(
-                    """
-                    SELECT
-                        p.base_user,
-                        p.reviewer,
-                        COALESCE((to_jsonb(p) ->> 'editor')::boolean, FALSE) AS editor,
-                        COALESCE(
-                            (to_jsonb(p) ->> 'admin')::boolean,
-                            (to_jsonb(p) ->> 'reviewer_creator')::boolean,
-                            FALSE
-                        ) AS admin,
-                        COALESCE((to_jsonb(p) ->> 'creator')::boolean, FALSE) AS creator
-                    FROM app.user_privileges p
-                    WHERE lower(p.email) = lower(:email)
-                    """
-                ),
-                {"email": normalized_email},
-            ).mappings().first()
-        except SQLAlchemyError as exc:
-            _log_timing("lookup_user_privileges.query_error", query_start, email=normalized_email)
-            timing_logger.warning(
-                "login_logic.timing event=lookup_user_privileges.error email=%s detail=%s",
-                normalized_email,
-                exc,
-            )
-            return privileges
-        _log_timing("lookup_user_privileges.query", query_start, email=normalized_email)
-        if result:
-            for name in _SQL_PRIVILEGE_COLUMNS:
-                privileges[name] = bool(result.get(name))
+        privileges = get_user_privileges(normalized_email)
+        _log_timing("lookup_user_privileges.bucket", query_start, email=normalized_email)
     _log_timing(
         "lookup_user_privileges.total",
         total_start,
@@ -319,7 +294,7 @@ def _lookup_user_privileges(session: Session, email: str) -> Dict[str, bool]:
 
 def _refresh_user_privileges(user: Dict[str, Any]) -> None:
     """
-    Refresh privileges from DB and update the session cache timestamp.
+    Refresh privileges from bucket and update the session cache timestamp.
     """
     if not user:
         return
@@ -329,13 +304,10 @@ def _refresh_user_privileges(user: Dict[str, Any]) -> None:
         return
 
     total_start = time.perf_counter()
-    session_start = time.perf_counter()
-    with readonly_session_scope() as session:
-        _log_timing("refresh_user_privileges.open_session", session_start, email=email)
-        step_start = time.perf_counter()
-        user["privileges"] = _lookup_user_privileges(session, email)
-        _log_timing("refresh_user_privileges.lookup", step_start, email=email)
-        user[_PRIVILEGES_REFRESH_TS_KEY] = time.time()
+    step_start = time.perf_counter()
+    user["privileges"] = _lookup_user_privileges(email)
+    _log_timing("refresh_user_privileges.lookup", step_start, email=email)
+    user[_PRIVILEGES_REFRESH_TS_KEY] = time.time()
     _log_timing("refresh_user_privileges.total", total_start, email=email)
 
 

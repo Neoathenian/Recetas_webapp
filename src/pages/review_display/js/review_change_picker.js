@@ -43,10 +43,10 @@
     menu.id = MENU_ID;
     menu.className = "the-list-review-change-menu";
     menu.innerHTML = [
-      "<div class='the-list-review-change-menu__title'>Select source for this change</div>",
-      "<button type='button' class='the-list-review-change-menu__btn' data-review-source='base'>Select base</button>",
-      "<button type='button' class='the-list-review-change-menu__btn' data-review-source='current'>Select current (compiled)</button>",
-      "<button type='button' class='the-list-review-change-menu__btn' data-review-source='proposed'>Select proposed</button>",
+      "<div class='the-list-review-change-menu__title'>Selecciona el origen de este cambio</div>",
+      "<button type='button' class='the-list-review-change-menu__btn' data-review-source='base'>Seleccionar base</button>",
+      "<button type='button' class='the-list-review-change-menu__btn' data-review-source='current'>Seleccionar actual (compilado)</button>",
+      "<button type='button' class='the-list-review-change-menu__btn' data-review-source='proposed'>Seleccionar propuesto</button>",
     ].join("");
     document.body.appendChild(menu);
     return menu;

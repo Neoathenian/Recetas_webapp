@@ -138,10 +138,10 @@ def insert_rows_in_db(table: TableInfo, rows: Sequence[Dict[str, Any]]) -> tuple
                 successes += 1
                 continue
             logger.warning("Failed to import row %s into %s: %s", index, table.name, exc)
-            failures.append(f"row {index}: {exc}")
+            failures.append(f"fila {index}: {exc}")
         except Exception as exc:  # pragma: no cover - error reporting path
             logger.warning("Failed to import row %s into %s: %s", index, table.name, exc)
-            failures.append(f"row {index}: {exc}")
+            failures.append(f"fila {index}: {exc}")
     return successes, failures
 
 
@@ -156,15 +156,15 @@ def update_row_in_db(
 
 def _resolve_uploaded_file(upload: Any) -> Tuple[Path, str]:
     if upload is None:
-        raise ValueError("Choose a CSV file to upload.")
+        raise ValueError("Selecciona un archivo CSV para subir.")
 
     if isinstance(upload, list):
         if not upload:
-            raise ValueError("Choose a CSV file to upload.")
+            raise ValueError("Selecciona un archivo CSV para subir.")
         upload = upload[0]
 
     if upload is None:
-        raise ValueError("Choose a CSV file to upload.")
+        raise ValueError("Selecciona un archivo CSV para subir.")
 
     name_hint: str | None = None
     candidates: List[Path] = []
@@ -201,7 +201,7 @@ def _resolve_uploaded_file(upload: Any) -> Tuple[Path, str]:
                 display_name = str(display)
             return candidate, display_name
 
-    raise ValueError("Unable to access the uploaded file on disk.")
+    raise ValueError("No se pudo acceder al archivo subido en disco.")
 
 
 def _parse_csv_rows(table: TableInfo, file_path: Path) -> List[Dict[str, Any]]:
@@ -209,31 +209,31 @@ def _parse_csv_rows(table: TableInfo, file_path: Path) -> List[Dict[str, Any]]:
         with file_path.open("r", newline="", encoding="utf-8-sig") as handle:
             reader = csv.DictReader(handle)
             if reader.fieldnames is None:
-                raise ValueError("CSV file must include a header row.")
+                raise ValueError("El CSV debe incluir una fila de encabezado.")
 
             header = []
             for field in reader.fieldnames:
                 if field is None:
-                    raise ValueError("CSV header contains an empty column name.")
+                    raise ValueError("El encabezado del CSV contiene un nombre de columna vacío.")
                 trimmed = field.strip()
                 if not trimmed:
-                    raise ValueError("CSV header contains an empty column name.")
+                    raise ValueError("El encabezado del CSV contiene un nombre de columna vacío.")
                 header.append(trimmed)
 
             if len(set(header)) != len(header):
                 duplicates = sorted({name for name in header if header.count(name) > 1})
-                raise ValueError(f"CSV header has duplicate columns: {', '.join(duplicates)}.")
+                raise ValueError(f"El encabezado del CSV tiene columnas duplicadas: {', '.join(duplicates)}.")
 
             reader.fieldnames = header
 
             table_columns = [col.name for col in table.columns]
             missing = [col for col in table_columns if col not in header]
             if missing:
-                raise ValueError(f"CSV file is missing columns: {', '.join(missing)}.")
+                raise ValueError(f"Al CSV le faltan columnas: {', '.join(missing)}.")
 
             unexpected = [col for col in header if col not in table_columns]
             if unexpected:
-                raise ValueError(f"CSV file has unexpected columns: {', '.join(unexpected)}.")
+                raise ValueError(f"El CSV tiene columnas no esperadas: {', '.join(unexpected)}.")
 
             parsed_rows: List[Dict[str, Any]] = []
             for row_number, csv_row in enumerate(reader, start=2):
@@ -258,21 +258,21 @@ def _parse_csv_rows(table: TableInfo, file_path: Path) -> List[Dict[str, Any]]:
                         try:
                             value = cast_value(raw_value, column)
                         except ValueError as exc:
-                            raise ValueError(f"Row {row_number}: {exc}") from exc
+                            raise ValueError(f"Fila {row_number}: {exc}") from exc
 
                     if value is None and not column.nullable and not column.has_default:
-                        raise ValueError(f"Row {row_number}: Column '{column.name}' requires a value.")
+                        raise ValueError(f"Fila {row_number}: la columna '{column.name}' requiere un valor.")
 
                     record[column.name] = value
 
                 parsed_rows.append(record)
     except UnicodeDecodeError as exc:
-        raise ValueError("CSV file must be UTF-8 encoded.") from exc
+        raise ValueError("El CSV debe estar codificado en UTF-8.") from exc
     except csv.Error as exc:
-        raise ValueError(f"CSV parsing error: {exc}.") from exc
+        raise ValueError(f"Error al parsear el CSV: {exc}.") from exc
 
     if not parsed_rows:
-        raise ValueError("CSV file does not contain any data rows.")
+        raise ValueError("El CSV no contiene filas de datos.")
 
     return parsed_rows
 
@@ -281,7 +281,7 @@ def handle_csv_upload(info_json: str, rows_json: str, upload_value: Any):
     if not info_json:
         return (
             gr.update(),
-            "Select a table before uploading.",
+            "Selecciona una tabla antes de subir.",
             rows_json,
             gr.update(visible=False),
             gr.update(visible=False),
@@ -294,7 +294,7 @@ def handle_csv_upload(info_json: str, rows_json: str, upload_value: Any):
     if not upload_value:
         return (
             gr.update(),
-            "Choose a CSV file to upload.",
+            "Selecciona un archivo CSV para subir.",
             rows_json,
             gr.update(visible=False),
             gr.update(visible=False),
@@ -320,7 +320,7 @@ def handle_csv_upload(info_json: str, rows_json: str, upload_value: Any):
         logger.exception("Failed to import CSV for %s", table.name)
         return (
             gr.update(),
-            f"❌ Failed to import CSV: {exc}",
+            f"❌ Error al importar CSV: {exc}",
             rows_json,
             gr.update(visible=False),
             gr.update(visible=False),
@@ -334,19 +334,19 @@ def handle_csv_upload(info_json: str, rows_json: str, upload_value: Any):
     messages: List[str] = []
     if success_count:
         messages.append(
-            f"✅ Uploaded {success_count} of {total_rows} row{'s' if total_rows != 1 else ''} "
-            f"from {display_name}. {summary}"
+            f"✅ Se subieron {success_count} de {total_rows} fila{'s' if total_rows != 1 else ''} "
+            f"desde {display_name}. {summary}"
         )
     else:
         messages.append(
-            f"⚠️ No rows from {display_name} were imported. {summary}"
+            f"⚠️ No se importó ninguna fila de {display_name}. {summary}"
         )
 
     if failed_rows:
         preview = "; ".join(failed_rows[:5])
         if len(failed_rows) > 5:
             preview += " …"
-        messages.append(f"⚠️ {len(failed_rows)} row(s) failed: {preview}")
+        messages.append(f"⚠️ Fallaron {len(failed_rows)} fila(s): {preview}")
 
     message = "\n".join(messages)
 
