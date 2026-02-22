@@ -368,7 +368,7 @@ def _filter_people_for_tag_selection(
 
     selected_normalized.discard(all_key)
     if not selected_normalized:
-        return []
+        return list(people)
 
     filtered_rows: List[Dict[str, object]] = []
     for row in people:

@@ -183,7 +183,7 @@ def _load_the_list_page(request: gr.Request):
         tag_filter_update, _tag_filter_choices, tag_filter_selection = _build_tag_filter_update(
             recipes,
             selected_tags,
-            default_to_all=True,
+            default_to_all=False,
         )
         filtered_rows = _filter_people_for_tag_selection(recipes, tag_filter_selection)
         cards_html = _render_cards(filtered_rows)
@@ -230,7 +230,7 @@ def make_the_list_app() -> gr.Blocks:
                     tag_filter = gr.Dropdown(
                         label="Filter by tags",
                         choices=[(TAG_FILTER_ALL_OPTION, TAG_FILTER_ALL_OPTION)],
-                        value=[TAG_FILTER_ALL_OPTION],
+                        value=[],
                         multiselect=True,
                         allow_custom_value=False,
                         interactive=True,
@@ -239,7 +239,7 @@ def make_the_list_app() -> gr.Blocks:
                         elem_id="people-tag-filter",
                     )
 
-            tag_filter_selection_state = gr.State([TAG_FILTER_ALL_OPTION])
+            tag_filter_selection_state = gr.State([])
             cards_html = gr.HTML(elem_id="people-cards")
 
         app.load(timed_page_load("/recetas", _header_the_list), outputs=[hdr])
