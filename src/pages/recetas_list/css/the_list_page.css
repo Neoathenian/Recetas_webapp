@@ -54,9 +54,10 @@
 #people-search {
   margin-left: auto;
   align-self: flex-end;
-  width: 230px;
-  max-width: 250px;
-  min-width: 170px;
+  flex: 0 0 360px !important;
+  width: 360px !important;
+  max-width: 380px !important;
+  min-width: 280px !important;
   --block-border-width: 0;
   --block-padding: 0;
   --block-background-fill: transparent;
@@ -65,17 +66,29 @@
   box-shadow: none !important;
 }
 
+#people-search > label,
+#people-search .input-container {
+  width: 100% !important;
+  max-width: none !important;
+}
+
 #people-search input[type="text"],
 #people-search textarea {
+  width: 100% !important;
   height: 42px !important;
   min-height: 42px !important;
+  box-sizing: border-box;
   border-radius: 10px;
   border: 1px solid #b8c2cc !important;
-  background: #ffffff !important;
+  background-color: #ffffff !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7785' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cline x1='16.65' y1='16.65' x2='21' y2='21'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 12px center;
+  background-size: 14px 14px;
   color: var(--recetas-text) !important;
   font-size: 0.85rem;
   line-height: 42px;
-  padding: 0 0.64rem !important;
+  padding: 0 0.64rem 0 2.1rem !important;
   overflow-y: hidden !important;
 }
 
@@ -281,9 +294,10 @@
 
   #people-search {
     margin-left: 0;
-    width: min(55vw, 260px);
-    max-width: 260px;
-    min-width: 170px;
+    flex: 0 0 min(68vw, 360px) !important;
+    width: min(68vw, 360px) !important;
+    max-width: 360px !important;
+    min-width: 240px !important;
   }
 
   #people-filter-row {
@@ -307,9 +321,10 @@
   }
 
   #people-search {
-    width: min(46vw, 220px);
-    max-width: 220px;
-    min-width: 140px;
+    flex: 0 0 min(70vw, 300px) !important;
+    width: min(70vw, 300px) !important;
+    max-width: 300px !important;
+    min-width: 220px !important;
   }
 
   #people-tag-filter,
