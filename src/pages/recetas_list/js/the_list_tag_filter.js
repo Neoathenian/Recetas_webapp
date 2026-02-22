@@ -1,11 +1,13 @@
 (function () {
   if (typeof window === "undefined") return;
 
-  const DROPDOWN_ID = "people-tag-filter";
+  const DROPDOWN_CONFIGS = [
+    { id: "people-tag-filter", placeholder: "Filter by tags", singular: "tag", plural: "tags" },
+    { id: "people-tool-filter", placeholder: "Filter by tools", singular: "tool", plural: "tools" },
+  ];
   const CREATE_TRIGGER_ID = "the-list-create-profile-trigger";
   const CREATE_PAGE_PATH = "/recetas/";
   const ALL_VALUE = "all";
-  const PLACEHOLDER = "Filter by tags";
 
   const ensureRoot = () => {
     if (typeof window.gradioApp === "function") {
@@ -115,10 +117,10 @@
     return unique.size;
   };
 
-  const summaryText = (count) => {
-    if (count <= 0) return PLACEHOLDER;
-    if (count === 1) return "1 tag selected";
-    return `${count} tags selected`;
+  const summaryText = (count, config) => {
+    if (count <= 0) return config.placeholder;
+    if (count === 1) return `1 ${config.singular} selected`;
+    return `${count} ${config.plural} selected`;
   };
 
   const stripNativeTick = (node) => {
@@ -194,8 +196,8 @@
     });
   };
 
-  const updateSummary = (scope) => {
-    const summary = summaryText(parseSelectionCount(scope));
+  const updateSummary = (scope, config) => {
+    const summary = summaryText(parseSelectionCount(scope), config);
     const summaryTargets = [
       scope.querySelector(".wrap"),
       scope.querySelector(".wrap-inner"),
@@ -206,7 +208,7 @@
     ].filter(Boolean);
     summaryTargets.forEach((target) => {
       target.dataset.summary = summary;
-      target.dataset.placeholder = PLACEHOLDER;
+      target.dataset.placeholder = config.placeholder;
     });
 
     scope.querySelectorAll("input[type='text']").forEach((input) => {
@@ -382,10 +384,12 @@
     scope.appendChild(style);
   };
 
-  const bindDropdown = () => {
+  const bindDropdown = (config) => {
+    const dropdownId = String(config?.id || "").trim();
+    if (!dropdownId) return;
     const root = ensureRoot();
     if (!root) return;
-    const host = root.querySelector(`#${DROPDOWN_ID}`);
+    const host = root.querySelector(`#${dropdownId}`);
     if (!host || host.dataset.peopleTagDropdownBound === "1") return;
     const scope = host.shadowRoot || host;
     const listScrollPositions = new WeakMap();
@@ -410,7 +414,7 @@
     };
 
     const getStoredScroll = () => {
-      const fromGlobal = window._peopleTagDropdownScrolls.get(DROPDOWN_ID);
+      const fromGlobal = window._peopleTagDropdownScrolls.get(dropdownId);
       if (typeof fromGlobal === "number" && !Number.isNaN(fromGlobal)) return fromGlobal;
       return parseNumber(host.dataset.peopleTagScroll || "0");
     };
@@ -422,7 +426,7 @@
         listScrollPositions.set(list, next);
       }
       host.dataset.peopleTagScroll = String(next);
-      window._peopleTagDropdownScrolls.set(DROPDOWN_ID, next);
+      window._peopleTagDropdownScrolls.set(dropdownId, next);
     };
 
     const setSuppressScrollCapture = (delayMs = 160) => {
@@ -498,7 +502,7 @@
       decorateOptions(scope);
       bindOptionScrollSnapshot();
       refreshOptionState(scope);
-      updateSummary(scope);
+      updateSummary(scope, config);
       restoreScrollPositions(lists, scrollPositions);
       window.requestAnimationFrame(() => {
         restoreScrollPositions(lists, scrollPositions);
@@ -590,7 +594,7 @@
   };
 
   const bootstrap = () => {
-    bindDropdown();
+    DROPDOWN_CONFIGS.forEach((config) => bindDropdown(config));
     bindCreateTrigger();
   };
 

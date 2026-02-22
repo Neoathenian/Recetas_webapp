@@ -14,11 +14,15 @@ from src.page_timing import timed_page_load
 from src.pages.header import render_header, with_light_mode_head
 from src.pages.recetas_list.core_the_list import (
     TAG_FILTER_ALL_OPTION,
+    TOOL_FILTER_ALL_OPTION,
     _build_tag_filter_choices,
     _build_tag_filter_update,
+    _build_tool_filter_choices,
+    _build_tool_filter_update,
     _choice_values,
     _fetch_all_people,
     _filter_people_for_tag_selection,
+    _filter_people_for_tool_selection,
     _normalize_selection,
     _normalize_tag,
     _parse_tag_query_values,
@@ -110,16 +114,15 @@ def _render_cards(recipes: Sequence[Dict[str, object]]) -> str:
     return f'<div class="people-grid">{"".join(cards)}</div>'
 
 
-def _update_people_cards_by_tag_filter(
+def _resolve_next_filter_selection(
     current_selection: Sequence[object] | None,
     previous_selection: Sequence[object] | None,
-):
-    total_start = time.perf_counter()
-
-    recipes = _fetch_all_people()
-    choices = _build_tag_filter_choices(recipes)
+    choices: Sequence[object],
+    *,
+    all_option: str,
+) -> tuple[gr.update, List[str]]:
     choice_values = _choice_values(choices)
-    all_key = _normalize_tag(TAG_FILTER_ALL_OPTION)
+    all_key = _normalize_tag(all_option)
     allowed_values = [value for value in choice_values if _normalize_tag(value) != all_key]
 
     current_norm = {_normalize_tag(value) for value in _normalize_selection(current_selection)}
@@ -134,41 +137,85 @@ def _update_people_cards_by_tag_filter(
     dropdown_update = gr.update()
 
     if current_has_all and not current_filtered:
-        next_selection = [TAG_FILTER_ALL_OPTION, *allowed_values] if allowed_values else [TAG_FILTER_ALL_OPTION]
+        next_selection = [all_option, *allowed_values] if allowed_values else [all_option]
         dropdown_update = gr.update(value=next_selection)
     elif current_has_all and not previous_has_all:
         if (not current_filtered) or (current_filtered == previous_filtered):
-            next_selection = [TAG_FILTER_ALL_OPTION, *allowed_values]
+            next_selection = [all_option, *allowed_values]
             dropdown_update = gr.update(value=next_selection)
         elif len(current_filtered) < len(allowed_values):
             next_selection = current_filtered
         else:
-            next_selection = [TAG_FILTER_ALL_OPTION, *allowed_values]
+            next_selection = [all_option, *allowed_values]
     elif (not current_has_all) and previous_has_all and len(current_filtered) == len(allowed_values):
         next_selection = []
         dropdown_update = gr.update(value=next_selection)
     elif current_has_all and previous_has_all and len(current_filtered) < len(previous_filtered):
         next_selection = current_filtered
     elif current_has_all and len(current_filtered) == len(allowed_values):
-        next_selection = [TAG_FILTER_ALL_OPTION, *allowed_values]
+        next_selection = [all_option, *allowed_values]
     elif len(current_filtered) == len(allowed_values) and allowed_values:
-        next_selection = [TAG_FILTER_ALL_OPTION, *allowed_values]
+        next_selection = [all_option, *allowed_values]
         dropdown_update = gr.update(value=next_selection)
 
     next_has_all = any(_normalize_tag(value) == all_key for value in next_selection)
     if current_has_all and not next_has_all:
         dropdown_update = gr.update(value=next_selection)
 
-    filtered_rows = _filter_people_for_tag_selection(recipes, next_selection)
+    return dropdown_update, next_selection
+
+
+def _apply_recipe_filters(
+    recipes: Sequence[Dict[str, object]],
+    tag_selection: Sequence[object] | None,
+    tool_selection: Sequence[object] | None,
+) -> List[Dict[str, object]]:
+    tag_filtered_rows = _filter_people_for_tag_selection(recipes, tag_selection)
+    return _filter_people_for_tool_selection(tag_filtered_rows, tool_selection)
+
+
+def _update_people_cards_by_filters(
+    current_tag_selection: Sequence[object] | None,
+    previous_tag_selection: Sequence[object] | None,
+    current_tool_selection: Sequence[object] | None,
+    previous_tool_selection: Sequence[object] | None,
+):
+    total_start = time.perf_counter()
+
+    recipes = _fetch_all_people()
+    tag_choices = _build_tag_filter_choices(recipes)
+    tool_choices = _build_tool_filter_choices(recipes)
+
+    tag_dropdown_update, next_tag_selection = _resolve_next_filter_selection(
+        current_tag_selection,
+        previous_tag_selection,
+        tag_choices,
+        all_option=TAG_FILTER_ALL_OPTION,
+    )
+    tool_dropdown_update, next_tool_selection = _resolve_next_filter_selection(
+        current_tool_selection,
+        previous_tool_selection,
+        tool_choices,
+        all_option=TOOL_FILTER_ALL_OPTION,
+    )
+
+    filtered_rows = _apply_recipe_filters(recipes, next_tag_selection, next_tool_selection)
     cards_update = gr.update(value=_render_cards(filtered_rows), visible=True)
 
     _log_timing(
-        "update_tag_filter.total",
+        "update_filters.total",
         total_start,
-        selected=len(next_selection),
+        selected_tags=len(next_tag_selection),
+        selected_tools=len(next_tool_selection),
         filtered_rows=len(filtered_rows),
     )
-    return dropdown_update, next_selection, cards_update
+    return (
+        tag_dropdown_update,
+        next_tag_selection,
+        tool_dropdown_update,
+        next_tool_selection,
+        cards_update,
+    )
 
 
 def _header_the_list(request: gr.Request):
@@ -180,19 +227,26 @@ def _load_the_list_page(request: gr.Request):
     try:
         recipes = _fetch_all_people()
         selected_tags = _parse_tag_query_values(_query_param(request, "tag"))
+        selected_tools = _parse_tag_query_values(_query_param(request, "tool"))
         tag_filter_update, _tag_filter_choices, tag_filter_selection = _build_tag_filter_update(
             recipes,
             selected_tags,
             default_to_all=False,
         )
-        filtered_rows = _filter_people_for_tag_selection(recipes, tag_filter_selection)
+        tool_filter_update, _tool_filter_choices, tool_filter_selection = _build_tool_filter_update(
+            recipes,
+            selected_tools,
+            default_to_all=False,
+        )
+        filtered_rows = _apply_recipe_filters(recipes, tag_filter_selection, tool_filter_selection)
         cards_html = _render_cards(filtered_rows)
 
         _log_timing(
             "load_recetas.total",
             total_start,
             recipes=len(recipes),
-            selected=len(tag_filter_selection),
+            selected_tags=len(tag_filter_selection),
+            selected_tools=len(tool_filter_selection),
             filtered=len(filtered_rows),
         )
         return (
@@ -200,6 +254,8 @@ def _load_the_list_page(request: gr.Request):
             gr.update(visible=True),
             tag_filter_update,
             tag_filter_selection,
+            tool_filter_update,
+            tool_filter_selection,
             gr.update(value=cards_html, visible=True),
         )
     except Exception as exc:  # noqa: BLE001
@@ -208,6 +264,8 @@ def _load_the_list_page(request: gr.Request):
             "<h2>Recetas</h2>",
             gr.update(visible=False),
             gr.update(choices=[(TAG_FILTER_ALL_OPTION, TAG_FILTER_ALL_OPTION)], value=[], interactive=True),
+            [],
+            gr.update(choices=[(TOOL_FILTER_ALL_OPTION, TOOL_FILTER_ALL_OPTION)], value=[], interactive=True),
             [],
             gr.update(value='<div class="people-empty">Could not load recipes.</div>', visible=True),
         )
@@ -226,7 +284,7 @@ def make_the_list_app() -> gr.Blocks:
         with gr.Column(elem_id="people-shell"):
             with gr.Row(elem_id="people-title-row"):
                 title_md = gr.HTML("<h2>Recetas</h2>", elem_id="people-title")
-                with gr.Column(elem_id="people-filter-row", visible=True, scale=0, min_width=210) as tag_filter_row:
+                with gr.Row(elem_id="people-filter-row", visible=True) as tag_filter_row:
                     tag_filter = gr.Dropdown(
                         label="Filter by tags",
                         choices=[(TAG_FILTER_ALL_OPTION, TAG_FILTER_ALL_OPTION)],
@@ -238,8 +296,20 @@ def make_the_list_app() -> gr.Blocks:
                         container=False,
                         elem_id="people-tag-filter",
                     )
+                    tool_filter = gr.Dropdown(
+                        label="Filter by tools",
+                        choices=[(TOOL_FILTER_ALL_OPTION, TOOL_FILTER_ALL_OPTION)],
+                        value=[],
+                        multiselect=True,
+                        allow_custom_value=False,
+                        interactive=True,
+                        show_label=False,
+                        container=False,
+                        elem_id="people-tool-filter",
+                    )
 
             tag_filter_selection_state = gr.State([])
+            tool_filter_selection_state = gr.State([])
             cards_html = gr.HTML(elem_id="people-cards")
 
         app.load(timed_page_load("/recetas", _header_the_list), outputs=[hdr])
@@ -250,18 +320,28 @@ def make_the_list_app() -> gr.Blocks:
                 tag_filter_row,
                 tag_filter,
                 tag_filter_selection_state,
+                tool_filter,
+                tool_filter_selection_state,
                 cards_html,
             ],
         )
 
+        filter_update_handler = timed_page_load(
+            "/recetas",
+            _update_people_cards_by_filters,
+            label="update_receta_cards_by_filters",
+        )
+
         tag_filter.input(
-            timed_page_load(
-                "/recetas",
-                _update_people_cards_by_tag_filter,
-                label="update_receta_cards_by_tag_filter",
-            ),
-            inputs=[tag_filter, tag_filter_selection_state],
-            outputs=[tag_filter, tag_filter_selection_state, cards_html],
+            filter_update_handler,
+            inputs=[tag_filter, tag_filter_selection_state, tool_filter, tool_filter_selection_state],
+            outputs=[tag_filter, tag_filter_selection_state, tool_filter, tool_filter_selection_state, cards_html],
+            show_progress=False,
+        )
+        tool_filter.input(
+            filter_update_handler,
+            inputs=[tag_filter, tag_filter_selection_state, tool_filter, tool_filter_selection_state],
+            outputs=[tag_filter, tag_filter_selection_state, tool_filter, tool_filter_selection_state, cards_html],
             show_progress=False,
         )
 

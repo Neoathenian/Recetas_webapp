@@ -43,15 +43,19 @@
   margin-left: auto;
   flex: 0 0 auto !important;
   align-self: center;
-  width: 220px !important;
-  max-width: 220px;
-  min-width: 170px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: auto !important;
+  max-width: 100%;
+  min-width: 360px;
 }
 
-#people-tag-filter {
-  width: 100%;
-  max-width: none;
-  min-width: 0;
+#people-tag-filter,
+#people-tool-filter {
+  width: 220px;
+  max-width: 220px;
+  min-width: 170px;
   --block-border-width: 0;
   --block-padding: 0;
   --block-background-fill: transparent;
@@ -60,7 +64,8 @@
   box-shadow: none !important;
 }
 
-#people-tag-filter .wrap {
+#people-tag-filter .wrap,
+#people-tool-filter .wrap {
   position: relative;
   min-height: 34px;
   border-radius: 10px;
@@ -69,16 +74,19 @@
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-#people-tag-filter .wrap:hover {
+#people-tag-filter .wrap:hover,
+#people-tool-filter .wrap:hover {
   border-color: #92a0ad;
 }
 
-#people-tag-filter .wrap:focus-within {
+#people-tag-filter .wrap:focus-within,
+#people-tool-filter .wrap:focus-within {
   border-color: #4b7a66;
   box-shadow: 0 0 0 2px rgba(75, 122, 102, 0.15);
 }
 
-#people-tag-filter .wrap::after {
+#people-tag-filter .wrap::after,
+#people-tool-filter .wrap::after {
   content: attr(data-summary);
   position: absolute;
   left: 10px;
@@ -90,14 +98,18 @@
 }
 
 #people-tag-filter input[type="text"],
-#people-tag-filter .wrap input {
+#people-tag-filter .wrap input,
+#people-tool-filter input[type="text"],
+#people-tool-filter .wrap input {
   min-height: 30px;
   color: transparent !important;
   caret-color: #1f2933;
 }
 
 #people-tag-filter input[type="text"]::placeholder,
-#people-tag-filter .wrap input::placeholder {
+#people-tag-filter .wrap input::placeholder,
+#people-tool-filter input[type="text"]::placeholder,
+#people-tool-filter .wrap input::placeholder {
   color: transparent !important;
 }
 
@@ -222,18 +234,36 @@
   background: #f8f9fa;
 }
 
+@media (max-width: 980px) {
+  #people-title-row {
+    flex-wrap: wrap !important;
+    align-items: flex-start;
+  }
+
+  #people-filter-row {
+    margin-left: 0;
+    min-width: 0;
+    width: 100% !important;
+  }
+}
+
 @media (max-width: 720px) {
   #people-title-row {
-    flex-direction: row;
-    align-items: center;
-    flex-wrap: nowrap !important;
+    align-items: flex-start;
     gap: 0.55rem;
   }
 
   #people-filter-row {
-    margin-left: auto;
-    width: min(46vw, 220px) !important;
+    width: 100% !important;
+    max-width: none;
+    min-width: 0;
+    gap: 0.45rem;
+  }
+
+  #people-tag-filter,
+  #people-tool-filter {
+    width: min(46vw, 220px);
     max-width: 220px;
-    min-width: 150px;
+    min-width: 140px;
   }
 }

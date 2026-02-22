@@ -11,6 +11,7 @@ from typing import Dict, List, Sequence, Tuple
 import gradio as gr
 
 TAG_FILTER_ALL_OPTION = "All"
+TOOL_FILTER_ALL_OPTION = "All"
 DEFAULT_CARD_COLOR = "rgb(118, 161, 146)"
 RECIPES_DIR = Path(__file__).resolve().parents[3] / "data" / "recipes"
 RGB_RE = re.compile(r"^rgb\s*\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$", re.IGNORECASE)
@@ -286,18 +287,70 @@ def _fetch_recipe_by_slug(slug: str) -> Dict[str, object] | None:
     return None
 
 
-def _build_tag_filter_choices(people: Sequence[Dict[str, object]]) -> List[Tuple[str, str]]:
-    unique_tags: set[str] = set()
+def _build_filter_choices(
+    people: Sequence[Dict[str, object]],
+    *,
+    field_name: str,
+    all_option: str,
+) -> List[Tuple[str, str]]:
+    unique_values: set[str] = set()
     for row in people:
-        for raw_tag in row.get("tags", []):
-            normalized_tag = _normalize_tag(str(raw_tag))
-            if normalized_tag:
-                unique_tags.add(normalized_tag)
+        for raw_value in row.get(field_name, []):
+            normalized_value = _normalize_tag(str(raw_value))
+            if normalized_value:
+                unique_values.add(normalized_value)
 
-    sorted_tags = sorted(unique_tags)
-    choices: List[Tuple[str, str]] = [(TAG_FILTER_ALL_OPTION, TAG_FILTER_ALL_OPTION)]
-    choices.extend((tag, tag) for tag in sorted_tags)
+    sorted_values = sorted(unique_values)
+    choices: List[Tuple[str, str]] = [(all_option, all_option)]
+    choices.extend((value, value) for value in sorted_values)
     return choices
+
+
+def _build_tag_filter_choices(people: Sequence[Dict[str, object]]) -> List[Tuple[str, str]]:
+    return _build_filter_choices(people, field_name="tags", all_option=TAG_FILTER_ALL_OPTION)
+
+
+def _build_tool_filter_choices(people: Sequence[Dict[str, object]]) -> List[Tuple[str, str]]:
+    return _build_filter_choices(people, field_name="tools", all_option=TOOL_FILTER_ALL_OPTION)
+
+
+def _resolve_filter_selection(
+    choices: Sequence[object],
+    selected_values: Sequence[object] | None,
+    *,
+    default_to_all: bool,
+    all_option: str,
+) -> List[str]:
+    all_values = _choice_values(choices)
+    if not all_values:
+        return []
+
+    all_option_normalized = _normalize_tag(all_option)
+    allowed_values = [value for value in all_values if _normalize_tag(value) != all_option_normalized]
+    if not allowed_values:
+        return []
+
+    selected = _normalize_selection(selected_values)
+    if not selected:
+        return [all_option, *allowed_values] if default_to_all else []
+
+    selected_normalized = {_normalize_tag(value) for value in selected}
+    filtered_values = [value for value in allowed_values if _normalize_tag(value) in selected_normalized]
+    has_all = all_option_normalized in selected_normalized
+
+    if has_all:
+        if not filtered_values:
+            return [all_option, *allowed_values]
+        if len(filtered_values) == len(allowed_values):
+            return [all_option, *allowed_values]
+        return filtered_values
+
+    if not filtered_values:
+        return [all_option, *allowed_values] if default_to_all else []
+
+    if len(filtered_values) == len(allowed_values):
+        return [all_option, *allowed_values]
+    return filtered_values
 
 
 def _resolve_tag_filter_selection(
@@ -306,36 +359,26 @@ def _resolve_tag_filter_selection(
     *,
     default_to_all: bool,
 ) -> List[str]:
-    all_values = _choice_values(choices)
-    if not all_values:
-        return []
+    return _resolve_filter_selection(
+        choices,
+        selected_values,
+        default_to_all=default_to_all,
+        all_option=TAG_FILTER_ALL_OPTION,
+    )
 
-    all_option_normalized = _normalize_tag(TAG_FILTER_ALL_OPTION)
-    allowed_values = [value for value in all_values if _normalize_tag(value) != all_option_normalized]
-    if not allowed_values:
-        return []
 
-    selected = _normalize_selection(selected_values)
-    if not selected:
-        return [TAG_FILTER_ALL_OPTION, *allowed_values] if default_to_all else []
-
-    selected_normalized = {_normalize_tag(value) for value in selected}
-    filtered_values = [value for value in allowed_values if _normalize_tag(value) in selected_normalized]
-    has_all = all_option_normalized in selected_normalized
-
-    if has_all:
-        if not filtered_values:
-            return [TAG_FILTER_ALL_OPTION, *allowed_values]
-        if len(filtered_values) == len(allowed_values):
-            return [TAG_FILTER_ALL_OPTION, *allowed_values]
-        return filtered_values
-
-    if not filtered_values:
-        return [TAG_FILTER_ALL_OPTION, *allowed_values] if default_to_all else []
-
-    if len(filtered_values) == len(allowed_values):
-        return [TAG_FILTER_ALL_OPTION, *allowed_values]
-    return filtered_values
+def _resolve_tool_filter_selection(
+    choices: Sequence[object],
+    selected_values: Sequence[object] | None,
+    *,
+    default_to_all: bool,
+) -> List[str]:
+    return _resolve_filter_selection(
+        choices,
+        selected_values,
+        default_to_all=default_to_all,
+        all_option=TOOL_FILTER_ALL_OPTION,
+    )
 
 
 def _build_tag_filter_update(
@@ -353,16 +396,34 @@ def _build_tag_filter_update(
     )
 
 
-def _filter_people_for_tag_selection(
+def _build_tool_filter_update(
+    people: Sequence[Dict[str, object]],
+    selected_values: Sequence[object] | None = None,
+    *,
+    default_to_all: bool = True,
+) -> tuple[gr.update, List[Tuple[str, str]], List[str]]:
+    choices = _build_tool_filter_choices(people)
+    resolved_selection = _resolve_tool_filter_selection(choices, selected_values, default_to_all=default_to_all)
+    return (
+        gr.update(choices=choices, value=resolved_selection, interactive=True),
+        choices,
+        resolved_selection,
+    )
+
+
+def _filter_people_for_selection(
     people: Sequence[Dict[str, object]],
     selected_values: Sequence[object] | None,
+    *,
+    field_name: str,
+    all_option: str,
 ) -> List[Dict[str, object]]:
     selected_normalized = {
         _normalize_tag(value)
         for value in _normalize_selection(selected_values)
         if _normalize_tag(value)
     }
-    all_key = _normalize_tag(TAG_FILTER_ALL_OPTION)
+    all_key = _normalize_tag(all_option)
     if all_key in selected_normalized:
         return list(people)
 
@@ -372,14 +433,38 @@ def _filter_people_for_tag_selection(
 
     filtered_rows: List[Dict[str, object]] = []
     for row in people:
-        row_tags = {
-            _normalize_tag(str(tag))
-            for tag in row.get("tags", [])
-            if _normalize_tag(str(tag))
+        row_values = {
+            _normalize_tag(str(value))
+            for value in row.get(field_name, [])
+            if _normalize_tag(str(value))
         }
-        if row_tags.intersection(selected_normalized):
+        if row_values.intersection(selected_normalized):
             filtered_rows.append(row)
     return filtered_rows
+
+
+def _filter_people_for_tag_selection(
+    people: Sequence[Dict[str, object]],
+    selected_values: Sequence[object] | None,
+) -> List[Dict[str, object]]:
+    return _filter_people_for_selection(
+        people,
+        selected_values,
+        field_name="tags",
+        all_option=TAG_FILTER_ALL_OPTION,
+    )
+
+
+def _filter_people_for_tool_selection(
+    people: Sequence[Dict[str, object]],
+    selected_values: Sequence[object] | None,
+) -> List[Dict[str, object]]:
+    return _filter_people_for_selection(
+        people,
+        selected_values,
+        field_name="tools",
+        all_option=TOOL_FILTER_ALL_OPTION,
+    )
 
 
 def _render_tag_chips(tags: Sequence[str], *, empty_label: str = "no-tags") -> str:
