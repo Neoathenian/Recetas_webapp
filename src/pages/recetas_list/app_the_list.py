@@ -165,13 +165,40 @@ def _resolve_next_filter_selection(
     return dropdown_update, next_selection
 
 
+def _normalize_search_query(value: object) -> str:
+    return str(value or "").strip().lower()
+
+
+def _filter_people_for_search_query(
+    recipes: Sequence[Dict[str, object]],
+    search_query: object,
+) -> List[Dict[str, object]]:
+    normalized_query = _normalize_search_query(search_query)
+    if not normalized_query:
+        return list(recipes)
+
+    filtered_rows: List[Dict[str, object]] = []
+    for row in recipes:
+        searchable_values: List[str] = [
+            str(row.get("name") or "").strip().lower(),
+            str(row.get("slug") or "").strip().lower(),
+        ]
+        searchable_values.extend(str(tag or "").strip().lower() for tag in row.get("tags", []))
+        searchable_values.extend(str(tool or "").strip().lower() for tool in row.get("tools", []))
+        if any(normalized_query in value for value in searchable_values if value):
+            filtered_rows.append(row)
+    return filtered_rows
+
+
 def _apply_recipe_filters(
     recipes: Sequence[Dict[str, object]],
     tag_selection: Sequence[object] | None,
     tool_selection: Sequence[object] | None,
+    search_query: object = "",
 ) -> List[Dict[str, object]]:
     tag_filtered_rows = _filter_people_for_tag_selection(recipes, tag_selection)
-    return _filter_people_for_tool_selection(tag_filtered_rows, tool_selection)
+    tool_filtered_rows = _filter_people_for_tool_selection(tag_filtered_rows, tool_selection)
+    return _filter_people_for_search_query(tool_filtered_rows, search_query)
 
 
 def _update_people_cards_by_filters(
@@ -179,6 +206,7 @@ def _update_people_cards_by_filters(
     previous_tag_selection: Sequence[object] | None,
     current_tool_selection: Sequence[object] | None,
     previous_tool_selection: Sequence[object] | None,
+    search_query: str,
 ):
     total_start = time.perf_counter()
 
@@ -199,7 +227,7 @@ def _update_people_cards_by_filters(
         all_option=TOOL_FILTER_ALL_OPTION,
     )
 
-    filtered_rows = _apply_recipe_filters(recipes, next_tag_selection, next_tool_selection)
+    filtered_rows = _apply_recipe_filters(recipes, next_tag_selection, next_tool_selection, search_query)
     cards_update = gr.update(value=_render_cards(filtered_rows), visible=True)
 
     _log_timing(
@@ -207,6 +235,7 @@ def _update_people_cards_by_filters(
         total_start,
         selected_tags=len(next_tag_selection),
         selected_tools=len(next_tool_selection),
+        search_chars=len(str(search_query or "").strip()),
         filtered_rows=len(filtered_rows),
     )
     return (
@@ -228,6 +257,7 @@ def _load_the_list_page(request: gr.Request):
         recipes = _fetch_all_people()
         selected_tags = _parse_tag_query_values(_query_param(request, "tag"))
         selected_tools = _parse_tag_query_values(_query_param(request, "tool"))
+        search_query = _query_param(request, "q") or _query_param(request, "search")
         tag_filter_update, _tag_filter_choices, tag_filter_selection = _build_tag_filter_update(
             recipes,
             selected_tags,
@@ -238,7 +268,7 @@ def _load_the_list_page(request: gr.Request):
             selected_tools,
             default_to_all=False,
         )
-        filtered_rows = _apply_recipe_filters(recipes, tag_filter_selection, tool_filter_selection)
+        filtered_rows = _apply_recipe_filters(recipes, tag_filter_selection, tool_filter_selection, search_query)
         cards_html = _render_cards(filtered_rows)
 
         _log_timing(
@@ -247,11 +277,13 @@ def _load_the_list_page(request: gr.Request):
             recipes=len(recipes),
             selected_tags=len(tag_filter_selection),
             selected_tools=len(tool_filter_selection),
+            search_chars=len(str(search_query or "").strip()),
             filtered=len(filtered_rows),
         )
         return (
             "<h2>Recetas</h2>",
             gr.update(visible=True),
+            gr.update(value=search_query),
             tag_filter_update,
             tag_filter_selection,
             tool_filter_update,
@@ -263,6 +295,7 @@ def _load_the_list_page(request: gr.Request):
         return (
             "<h2>Recetas</h2>",
             gr.update(visible=False),
+            gr.update(value=""),
             gr.update(choices=[(TAG_FILTER_ALL_OPTION, TAG_FILTER_ALL_OPTION)], value=[], interactive=True),
             [],
             gr.update(choices=[(TOOL_FILTER_ALL_OPTION, TOOL_FILTER_ALL_OPTION)], value=[], interactive=True),
@@ -284,6 +317,16 @@ def make_the_list_app() -> gr.Blocks:
         with gr.Column(elem_id="people-shell"):
             with gr.Row(elem_id="people-title-row"):
                 title_md = gr.HTML("<h2>Recetas</h2>", elem_id="people-title")
+                search_box = gr.Textbox(
+                    label="Search recipes",
+                    placeholder="Search recipes",
+                    value="",
+                    lines=1,
+                    interactive=True,
+                    show_label=False,
+                    container=False,
+                    elem_id="people-search",
+                )
                 with gr.Row(elem_id="people-filter-row", visible=True) as tag_filter_row:
                     tag_filter = gr.Dropdown(
                         label="Filter by tags",
@@ -318,6 +361,7 @@ def make_the_list_app() -> gr.Blocks:
             outputs=[
                 title_md,
                 tag_filter_row,
+                search_box,
                 tag_filter,
                 tag_filter_selection_state,
                 tool_filter,
@@ -334,13 +378,19 @@ def make_the_list_app() -> gr.Blocks:
 
         tag_filter.input(
             filter_update_handler,
-            inputs=[tag_filter, tag_filter_selection_state, tool_filter, tool_filter_selection_state],
+            inputs=[tag_filter, tag_filter_selection_state, tool_filter, tool_filter_selection_state, search_box],
             outputs=[tag_filter, tag_filter_selection_state, tool_filter, tool_filter_selection_state, cards_html],
             show_progress=False,
         )
         tool_filter.input(
             filter_update_handler,
-            inputs=[tag_filter, tag_filter_selection_state, tool_filter, tool_filter_selection_state],
+            inputs=[tag_filter, tag_filter_selection_state, tool_filter, tool_filter_selection_state, search_box],
+            outputs=[tag_filter, tag_filter_selection_state, tool_filter, tool_filter_selection_state, cards_html],
+            show_progress=False,
+        )
+        search_box.input(
+            filter_update_handler,
+            inputs=[tag_filter, tag_filter_selection_state, tool_filter, tool_filter_selection_state, search_box],
             outputs=[tag_filter, tag_filter_selection_state, tool_filter, tool_filter_selection_state, cards_html],
             show_progress=False,
         )

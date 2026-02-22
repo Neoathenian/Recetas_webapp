@@ -270,7 +270,7 @@
       .multiselect__tags,
       .vs__selected-options {
         position: relative;
-        min-height: 40px;
+        min-height: 20px;
       }
       .wrap::after,
       .wrap-inner::after,
@@ -298,7 +298,7 @@
       .choices__input,
       .multiselect__input,
       .vs__search {
-        min-height: 38px;
+        min-height: 20px;
         color: transparent !important;
         caret-color: #2563eb;
       }
