@@ -1,0 +1,116 @@
+#admin-shell {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+  gap: 1.25rem;
+  position: relative;
+  overflow: visible;
+}
+
+#admin-editor-area {
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+#admin-editor-area .gradio-button {
+  width: auto;
+  align-self: flex-start;
+}
+
+.admin-toolbar {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding-right: 220px;
+}
+
+.admin-toolbar .gradio-button,
+.admin-toolbar .gradio-dropdown {
+  width: auto;
+}
+
+.admin-toolbar .gradio-dropdown {
+  min-width: 220px;
+}
+
+#admin-upload-area {
+  position: absolute;
+  top: 4.5rem;
+  right: -120px;
+  z-index: 10;
+  width: auto;
+  min-width: 0 !important;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+#admin-upload-area .gradio-button {
+  width: auto;
+  white-space: nowrap;
+}
+
+#admin-editor-df button[aria-label*="menu" i],
+#admin-editor-df button[aria-label*="options" i],
+#admin-editor-df [role="button"][aria-label*="menu" i],
+#admin-editor-df [role="button"][aria-label*="options" i],
+#admin-editor-df .cell-menu-button {
+  display: none !important;
+}
+
+.admin-hidden {
+  display: none !important;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: transparent !important;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.modal-overlay.modal-visible {
+  display: flex !important;
+}
+
+.modal-overlay::before,
+.modal-overlay::after {
+  display: none !important;
+}
+
+.modal-content {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  min-width: 360px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+}
+
+.modal-overlay .modal-content {
+  pointer-events: auto;
+}
+
+.modal-text {
+  font-size: 16px;
+}
+
+.modal-actions {
+  gap: 12px;
+  justify-content: flex-end;
+  display: flex;
+}
+
+@media (max-width: 1200px) {
+  .admin-toolbar {
+    padding-right: 0;
+  }
+
+  #admin-upload-area {
+    position: static;
+    margin-left: auto;
+  }
+}

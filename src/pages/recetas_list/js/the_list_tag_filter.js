@@ -1,0 +1,607 @@
+(function () {
+  if (typeof window === "undefined") return;
+
+  const DROPDOWN_ID = "people-tag-filter";
+  const CREATE_TRIGGER_ID = "the-list-create-profile-trigger";
+  const CREATE_PAGE_PATH = "/recetas/";
+  const ALL_VALUE = "all";
+  const PLACEHOLDER = "Filter by tags";
+
+  const ensureRoot = () => {
+    if (typeof window.gradioApp === "function") {
+      try {
+        const app = window.gradioApp();
+        if (app) return app;
+      } catch (error) {
+        void error;
+      }
+    }
+    const host = document.querySelector("gradio-app");
+    return host ? host.shadowRoot || host : document;
+  };
+
+  const normalizeValue = (value) => String(value || "").trim().toLowerCase();
+  const isAllValue = (value) => normalizeValue(value) === ALL_VALUE;
+
+  const dedupeValues = (values) => {
+    const out = [];
+    const seen = new Set();
+    (values || []).forEach((value) => {
+      const text = String(value || "").trim();
+      if (!text) return;
+      const key = normalizeValue(text);
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push(text);
+    });
+    return out;
+  };
+
+  const hiddenInput = (scope) =>
+    scope.querySelector(
+      "textarea, input[type='hidden'], .choices input[type='hidden'], .multiselect input[type='hidden'], .selectize-control input[type='hidden']",
+    );
+
+  const parseValues = (scope) => {
+    const hidden = hiddenInput(scope);
+    if (!hidden) return [];
+    const raw = hidden.value || "";
+    if (!raw.trim()) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return dedupeValues(parsed.map((value) => String(value || "").trim()));
+      }
+    } catch (error) {
+      void error;
+    }
+    return dedupeValues(
+      raw
+        .split(/[\n,]+/)
+        .map((value) => value.trim())
+        .filter(Boolean),
+    );
+  };
+
+  const optionNodes = (scope) =>
+    Array.from(
+      scope.querySelectorAll(
+        ".options .item, .choices__list--dropdown .choices__item--selectable, .multiselect__option, .vs__dropdown-option, .selectize-dropdown .option",
+      ),
+    );
+
+  const extractOptionValue = (node) => {
+    if (!node) return "";
+    if (node.dataset && node.dataset.peopleOptionValue) {
+      return String(node.dataset.peopleOptionValue || "").trim();
+    }
+    if (node.dataset && node.dataset.value) return String(node.dataset.value || "").trim();
+    const childWithValue = node.querySelector && node.querySelector("[data-value]");
+    if (childWithValue && childWithValue.dataset && childWithValue.dataset.value) {
+      return String(childWithValue.dataset.value || "").trim();
+    }
+    const control = node.querySelector && node.querySelector("input[type='checkbox'], input[type='radio']");
+    if (control && typeof control.value !== "undefined") {
+      return String(control.value || "").trim();
+    }
+    return String(node.textContent || "").trim();
+  };
+
+  const normalizeOptionLabel = (value) =>
+    String(value || "")
+      .replace(/[✓✔]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const collectOptionValues = (scope) => {
+    const values = [];
+    const seen = new Set();
+    optionNodes(scope).forEach((node) => {
+      const value = String(extractOptionValue(node) || "").trim();
+      if (!value || isAllValue(value)) return;
+      const key = normalizeValue(value);
+      if (seen.has(key)) return;
+      seen.add(key);
+      values.push(value);
+    });
+    return values;
+  };
+
+  const parseSelectionCount = (scope) => {
+    const unique = new Set();
+    parseValues(scope).forEach((value) => {
+      if (!isAllValue(value)) unique.add(normalizeValue(value));
+    });
+    return unique.size;
+  };
+
+  const summaryText = (count) => {
+    if (count <= 0) return PLACEHOLDER;
+    if (count === 1) return "1 tag selected";
+    return `${count} tags selected`;
+  };
+
+  const stripNativeTick = (node) => {
+    if (!node || node.dataset.peopleTagTickStripped === "1") return;
+    const stableValue = normalizeOptionLabel(node.dataset.peopleOptionValue || "") || normalizeOptionLabel(extractOptionValue(node));
+    if (stableValue) node.dataset.peopleOptionValue = stableValue;
+    const cleanLabel =
+      normalizeOptionLabel(node.dataset.peopleCleanLabel || "") ||
+      stableValue ||
+      normalizeOptionLabel(node.textContent || "");
+    if (cleanLabel) {
+      node.dataset.peopleCleanLabel = cleanLabel;
+    }
+
+    let modified = false;
+    const firstEl = node.firstElementChild;
+    if (firstEl) {
+      const text = (firstEl.textContent || "").trim();
+      if (/^[✓✔]+$/.test(text)) {
+        firstEl.remove();
+        modified = true;
+      }
+    }
+    const firstSvg = node.querySelector && node.querySelector("svg");
+    if (firstSvg) {
+      firstSvg.remove();
+      modified = true;
+    }
+    const textNodeType = typeof Node !== "undefined" ? Node.TEXT_NODE : 3;
+    const textNode = node.firstChild;
+    if (textNode && textNode.nodeType === textNodeType) {
+      const next = textNode.textContent || "";
+      const replaced = next.replace(/^\s*[✓✔]+\s*/, "");
+      if (replaced !== next) {
+        textNode.textContent = replaced;
+        modified = true;
+      }
+    }
+    if (modified) {
+      node.dataset.peopleTagTickStripped = "1";
+    }
+  };
+
+  const decorateOptions = (scope) => {
+    optionNodes(scope).forEach((node) => {
+      node.classList.add("people-tag-option");
+      stripNativeTick(node);
+      const value = extractOptionValue(node);
+      const label = node.dataset.peopleCleanLabel || normalizeOptionLabel(node.textContent || "");
+      if (label) node.dataset.peopleCleanLabel = label;
+      node.classList.toggle("people-tag-option--all", isAllValue(value) || isAllValue(label));
+    });
+  };
+
+  const refreshOptionState = (scope) => {
+    const selected = dedupeValues(parseValues(scope));
+    const selectedSet = new Set(selected.map((value) => normalizeValue(value)));
+    const selectedNonAllSet = new Set([...selectedSet].filter((value) => !isAllValue(value)));
+
+    const allValues = collectOptionValues(scope);
+    const allValueSet = new Set(allValues.map((value) => normalizeValue(value)));
+    const allSelected =
+      allValueSet.size > 0 &&
+      allValueSet.size === selectedNonAllSet.size &&
+      [...allValueSet].every((value) => selectedNonAllSet.has(value));
+
+    optionNodes(scope).forEach((node) => {
+      const rawValue = extractOptionValue(node);
+      const label = node.dataset.peopleCleanLabel || "";
+      const normalized = normalizeValue(rawValue || label);
+      const active = isAllValue(normalized) ? allSelected : selectedNonAllSet.has(normalized);
+      node.classList.toggle("is-selected", active);
+    });
+  };
+
+  const updateSummary = (scope) => {
+    const summary = summaryText(parseSelectionCount(scope));
+    const summaryTargets = [
+      scope.querySelector(".wrap"),
+      scope.querySelector(".wrap-inner"),
+      scope.querySelector(".choices__inner"),
+      scope.querySelector(".multiselect__tags"),
+      scope.querySelector(".vs__selected-options"),
+      scope.querySelector(".selectize-input"),
+    ].filter(Boolean);
+    summaryTargets.forEach((target) => {
+      target.dataset.summary = summary;
+      target.dataset.placeholder = PLACEHOLDER;
+    });
+
+    scope.querySelectorAll("input[type='text']").forEach((input) => {
+      input.placeholder = summary;
+      if (document.activeElement !== input) {
+        input.value = "";
+      }
+    });
+  };
+
+  const hideSelectedPills = (scope) => {
+    const selectors = [
+      ".multiselect__tag",
+      ".multiselect__single",
+      ".multiselect__tags > *:not(.multiselect__input)",
+      ".selectize-control .item",
+      ".selectize-control .selectize-input > div",
+      ".vs__selected",
+      ".vs__selected-options > *:not(input):not(textarea):not(.vs__search)",
+      ".vs__selection",
+      ".choices__list--multiple .choices__item",
+      ".choices__list--single .choices__item",
+      ".wrap .token",
+      ".token",
+      ".token-remove",
+    ];
+    selectors.forEach((selector) => {
+      scope.querySelectorAll(selector).forEach((node) => {
+        node.style.display = "none";
+        node.setAttribute("aria-hidden", "true");
+      });
+    });
+  };
+
+  const ensureScopedStyles = (scope) => {
+    if (scope.querySelector("style[data-people-tag-style]")) return;
+    const style = document.createElement("style");
+    style.dataset.peopleTagStyle = "1";
+    style.textContent = `
+      .wrap .token,
+      .token,
+      .token-remove,
+      .multiselect__tag,
+      .multiselect__single,
+      .multiselect__tags > *:not(.multiselect__input),
+      .selectize-control .item,
+      .selectize-control .selectize-input > div,
+      .vs__selected,
+      .vs__selected-options > *:not(input):not(textarea):not(.vs__search),
+      .vs__selection,
+      .choices__list--multiple .choices__item,
+      .choices__list--single .choices__item {
+        display: none !important;
+      }
+      .wrap,
+      .wrap-inner,
+      .selectize-input,
+      .choices__inner,
+      .multiselect__tags,
+      .vs__selected-options {
+        position: relative;
+        min-height: 40px;
+      }
+      .wrap::after,
+      .wrap-inner::after,
+      .selectize-input::after,
+      .choices__inner::after,
+      .multiselect__tags::after,
+      .vs__selected-options::after {
+        content: attr(data-summary);
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #111827;
+        font-size: 0.95rem;
+        font-weight: 400;
+        pointer-events: none;
+      }
+      .choices.is-open .choices__inner::after,
+      .multiselect--active .multiselect__tags::after,
+      .vs--open .vs__selected-options::after,
+      .wrap:focus-within::after,
+      .wrap-inner:focus-within::after {
+        color: #9ca3af;
+      }
+      .choices__input,
+      .multiselect__input,
+      .vs__search {
+        min-height: 38px;
+        color: transparent !important;
+        caret-color: #2563eb;
+      }
+      .choices__input::placeholder,
+      .multiselect__input::placeholder,
+      .vs__search::placeholder {
+        color: transparent !important;
+      }
+      .choices__list--dropdown,
+      .multiselect__content-wrapper ul,
+      .vs__dropdown-menu,
+      .selectize-dropdown-content,
+      .wrap .options,
+      .wrap-inner .options,
+      .options {
+        max-height: 320px;
+        overflow-y: auto;
+        scroll-behavior: auto;
+      }
+      .people-tag-option,
+      .choices__list--dropdown .choices__item--selectable,
+      .multiselect__option,
+      .vs__dropdown-option,
+      .selectize-dropdown .option {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        min-height: 38px;
+        padding: 10px 12px 10px 43px !important;
+        border-radius: 6px;
+        color: #0f172a !important;
+        font-size: 0.95rem !important;
+        line-height: 1.35 !important;
+        cursor: pointer;
+        user-select: none;
+        background-color: transparent !important;
+        background-image: none !important;
+      }
+      .people-tag-option::before,
+      .choices__list--dropdown .choices__item--selectable::before,
+      .multiselect__option::before,
+      .vs__dropdown-option::before,
+      .selectize-dropdown .option::before {
+        content: "";
+        position: absolute;
+        left: 16px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 18px;
+        height: 18px;
+        border-radius: 6px;
+        border: 2px solid #3b82f6 !important;
+        background: #ffffff !important;
+        box-shadow: inset 0 0 0 2px #ffffff !important;
+      }
+      .people-tag-option.is-selected::before,
+      .people-tag-option[aria-selected="true"]::before,
+      .choices__list--dropdown .choices__item--selectable.is-selected::before,
+      .choices__list--dropdown .choices__item--selectable[aria-selected="true"]::before,
+      .multiselect__option--selected::before,
+      .vs__dropdown-option--selected::before,
+      .vs__dropdown-option[aria-selected="true"]::before,
+      .selectize-dropdown .option.selected::before,
+      .selectize-dropdown .option[aria-selected="true"]::before {
+        background: #3b82f6 !important;
+        border-color: #3b82f6 !important;
+        box-shadow: inset 0 0 0 3px #ffffff !important;
+      }
+      .people-tag-option--all {
+        font-weight: 700;
+      }
+      .people-tag-option input[type="checkbox"],
+      .people-tag-option input[type="radio"],
+      .people-tag-option svg,
+      .choices__list--dropdown .choices__item--selectable::after,
+      .multiselect__option::after,
+      .vs__dropdown-option::after,
+      .selectize-dropdown .option::after {
+        display: none !important;
+      }
+    `;
+    scope.appendChild(style);
+  };
+
+  const bindDropdown = () => {
+    const root = ensureRoot();
+    if (!root) return;
+    const host = root.querySelector(`#${DROPDOWN_ID}`);
+    if (!host || host.dataset.peopleTagDropdownBound === "1") return;
+    const scope = host.shadowRoot || host;
+    const listScrollPositions = new WeakMap();
+    let suppressScrollCapture = false;
+    let suppressScrollToken = 0;
+
+    if (!window._peopleTagDropdownScrolls) {
+      window._peopleTagDropdownScrolls = new Map();
+    }
+
+    const listSelector =
+      ".choices__list--dropdown, .selectize-dropdown-content, .multiselect__content-wrapper ul, .vs__dropdown-menu, .wrap .options, .wrap-inner .options, .options";
+
+    const optionLists = () =>
+      Array.from(scope.querySelectorAll(listSelector));
+
+    const listForNode = (node) => node?.closest?.(listSelector) || null;
+
+    const parseNumber = (value) => {
+      const parsed = Number(value);
+      return Number.isNaN(parsed) ? 0 : parsed;
+    };
+
+    const getStoredScroll = () => {
+      const fromGlobal = window._peopleTagDropdownScrolls.get(DROPDOWN_ID);
+      if (typeof fromGlobal === "number" && !Number.isNaN(fromGlobal)) return fromGlobal;
+      return parseNumber(host.dataset.peopleTagScroll || "0");
+    };
+
+    const rememberScrollPosition = (list, value) => {
+      const fallback = list ? list.scrollTop || 0 : getStoredScroll();
+      const next = typeof value === "number" && !Number.isNaN(value) ? value : fallback;
+      if (list) {
+        listScrollPositions.set(list, next);
+      }
+      host.dataset.peopleTagScroll = String(next);
+      window._peopleTagDropdownScrolls.set(DROPDOWN_ID, next);
+    };
+
+    const setSuppressScrollCapture = (delayMs = 160) => {
+      suppressScrollCapture = true;
+      suppressScrollToken += 1;
+      const token = suppressScrollToken;
+      window.setTimeout(() => {
+        if (token !== suppressScrollToken) return;
+        suppressScrollCapture = false;
+      }, delayMs);
+    };
+
+    const captureScrollPositions = (lists) =>
+      lists.map((list) => {
+        if (!list) return getStoredScroll();
+        if (!listScrollPositions.has(list)) {
+          rememberScrollPosition(list, getStoredScroll());
+        }
+        const stored = listScrollPositions.get(list);
+        return typeof stored === "number" ? stored : getStoredScroll();
+      });
+
+    const restoreScrollPositions = (lists, positions) => {
+      lists.forEach((list, index) => {
+        if (!list) return;
+        const fallback = getStoredScroll();
+        const value = typeof positions[index] === "number" ? positions[index] : fallback;
+        list.scrollTop = value;
+        rememberScrollPosition(list, value);
+      });
+    };
+
+    const bindListScrollListeners = () => {
+      optionLists().forEach((list) => {
+        if (!list || list.dataset.peopleTagScrollBound === "1") return;
+        list.addEventListener(
+          "scroll",
+          () => {
+            if (suppressScrollCapture) return;
+            rememberScrollPosition(list, list.scrollTop || 0);
+          },
+          { passive: true },
+        );
+        list.dataset.peopleTagScrollBound = "1";
+      });
+    };
+
+    const bindOptionScrollSnapshot = () => {
+      optionNodes(scope).forEach((node) => {
+        if (!node || node.dataset.peopleTagSnapshotBound === "1") return;
+        const snapshot = () => {
+          const list = listForNode(node);
+          if (!list) return;
+          rememberScrollPosition(list, list.scrollTop || 0);
+          setSuppressScrollCapture();
+        };
+        node.addEventListener("pointerdown", snapshot, { capture: true, passive: true });
+        node.addEventListener("mousedown", snapshot, { capture: true, passive: true });
+        node.addEventListener("click", snapshot, { capture: true, passive: true });
+        node.dataset.peopleTagSnapshotBound = "1";
+      });
+    };
+
+    ensureScopedStyles(scope);
+    let applyScheduled = false;
+
+    const apply = () => {
+      const lists = optionLists();
+      bindListScrollListeners();
+      const scrollPositions = captureScrollPositions(lists);
+      setSuppressScrollCapture();
+      hideSelectedPills(scope);
+      decorateOptions(scope);
+      bindOptionScrollSnapshot();
+      refreshOptionState(scope);
+      updateSummary(scope);
+      restoreScrollPositions(lists, scrollPositions);
+      window.requestAnimationFrame(() => {
+        restoreScrollPositions(lists, scrollPositions);
+      });
+      window.setTimeout(() => {
+        restoreScrollPositions(lists, scrollPositions);
+      }, 60);
+    };
+
+    const scheduleApply = () => {
+      if (applyScheduled) return;
+      applyScheduled = true;
+      window.requestAnimationFrame(() => {
+        applyScheduled = false;
+        apply();
+      });
+    };
+
+    const hidden = hiddenInput(scope);
+    if (hidden) {
+      hidden.addEventListener("input", () => {
+        setSuppressScrollCapture();
+        scheduleApply();
+      });
+      hidden.addEventListener("change", () => {
+        setSuppressScrollCapture();
+        scheduleApply();
+      });
+    }
+
+    const observer = new MutationObserver(() => {
+      scheduleApply();
+    });
+    observer.observe(scope, { childList: true, subtree: true });
+
+    apply();
+    host.dataset.peopleTagDropdownBound = "1";
+  };
+
+  const bindCreateTrigger = () => {
+    const root = ensureRoot();
+    if (!root) return;
+    const host = root.querySelector(`#${CREATE_TRIGGER_ID}`) || document.getElementById(CREATE_TRIGGER_ID);
+    if (!(host instanceof HTMLElement) || host.dataset.peopleCreateTriggerBound === "1") return;
+
+    const activate = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      window.location.assign(CREATE_PAGE_PATH);
+    };
+
+    let swallowNextClick = false;
+    host.addEventListener("pointerdown", (event) => {
+      if ("button" in event && event.button !== 0) return;
+      swallowNextClick = true;
+      activate(event);
+    });
+    host.addEventListener("click", (event) => {
+      if (swallowNextClick) {
+        swallowNextClick = false;
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      activate(event);
+    });
+    host.dataset.peopleCreateTriggerBound = "1";
+
+    const nestedButton = host.querySelector("button");
+    if (!(nestedButton instanceof HTMLButtonElement) || nestedButton.dataset.peopleCreateTriggerBound === "1") {
+      return;
+    }
+    let swallowNestedClick = false;
+    nestedButton.addEventListener("pointerdown", (event) => {
+      if ("button" in event && event.button !== 0) return;
+      swallowNestedClick = true;
+      activate(event);
+    });
+    nestedButton.addEventListener("click", (event) => {
+      if (swallowNestedClick) {
+        swallowNestedClick = false;
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      activate(event);
+    });
+    nestedButton.dataset.peopleCreateTriggerBound = "1";
+  };
+
+  const bootstrap = () => {
+    bindDropdown();
+    bindCreateTrigger();
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bootstrap);
+  } else {
+    bootstrap();
+  }
+
+  const rootObserver = new MutationObserver(() => {
+    window.requestAnimationFrame(bootstrap);
+  });
+  rootObserver.observe(document.body, { childList: true, subtree: true });
+})();

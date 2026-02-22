@@ -1,0 +1,16 @@
+steps:
+  - name: gcr.io/kaniko-project/executor:latest
+    args:
+      - --context=.
+      - --dockerfile=Dockerfile
+      - --destination=${_IMAGE_URI}
+      - --cache=true
+      - --cache-ttl=168h
+      - --cache-repo=${_CACHE_REPO}
+      - --build-arg=BASE_IMAGE=${_CACHE_IMAGE_URI}
+options:
+  machineType: E2_HIGHCPU_8
+  diskSizeGb: 100
+  requestedVerifyOption: NOT_VERIFIED
+  logging: CLOUD_LOGGING_ONLY
+timeout: 3600s

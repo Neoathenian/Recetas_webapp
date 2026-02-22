@@ -1,0 +1,32 @@
+{
+  "Name": "Pasta Pesto Rapida",
+  "Ingredients": {
+    "pasta": "320 g",
+    "basil pesto": "4 tbsp",
+    "parmesan": "40 g",
+    "garlic": "1 clove",
+    "olive oil": "2 tbsp",
+    "pasta water": "100 ml"
+  },
+  "Steps": [
+    "Boil pasta in salted water until al dente.",
+    "Reserve pasta water before draining.",
+    "Mix pesto, olive oil, and grated garlic in a warm pan.",
+    "Add pasta and enough pasta water to create a silky sauce.",
+    "Finish with parmesan and serve while hot."
+  ],
+  "Preparation time": "8 min",
+  "Total time": "20 min",
+  "N\u00bapersonas": "4",
+  "card image": "rgb(101, 143, 123)",
+  "Tags": [
+    "italian",
+    "pasta",
+    "weekday"
+  ],
+  "Tools": [
+    "pot",
+    "pan",
+    "colander"
+  ]
+}

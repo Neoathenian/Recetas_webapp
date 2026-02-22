@@ -1,0 +1,239 @@
+:root {
+  --recetas-bg: #f6f5f0;
+  --recetas-card-bg: #ffffff;
+  --recetas-border: #d5d7d8;
+  --recetas-text: #1f2933;
+  --recetas-muted: #5f6c76;
+  --recetas-accent: #154734;
+}
+
+#people-shell {
+  max-width: 1360px;
+  margin: 0 auto;
+  gap: 0.9rem;
+  padding-bottom: 1.4rem;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+}
+
+#people-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: nowrap !important;
+  gap: 0.9rem;
+  width: 100%;
+}
+
+#people-title {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+#people-title h2 {
+  margin: 0;
+  color: var(--recetas-accent);
+  font-size: clamp(2.1rem, 1.4rem + 2.2vw, 3.5rem);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  font-weight: 760;
+}
+
+#people-filter-row {
+  margin-left: auto;
+  flex: 0 0 auto !important;
+  align-self: center;
+  width: 220px !important;
+  max-width: 220px;
+  min-width: 170px;
+}
+
+#people-tag-filter {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  --block-border-width: 0;
+  --block-padding: 0;
+  --block-background-fill: transparent;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+#people-tag-filter .wrap {
+  position: relative;
+  min-height: 34px;
+  border-radius: 10px;
+  border: 1px solid #b8c2cc;
+  background: #ffffff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#people-tag-filter .wrap:hover {
+  border-color: #92a0ad;
+}
+
+#people-tag-filter .wrap:focus-within {
+  border-color: #4b7a66;
+  box-shadow: 0 0 0 2px rgba(75, 122, 102, 0.15);
+}
+
+#people-tag-filter .wrap::after {
+  content: attr(data-summary);
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--recetas-text);
+  font-size: 0.85rem;
+  pointer-events: none;
+}
+
+#people-tag-filter input[type="text"],
+#people-tag-filter .wrap input {
+  min-height: 30px;
+  color: transparent !important;
+  caret-color: #1f2933;
+}
+
+#people-tag-filter input[type="text"]::placeholder,
+#people-tag-filter .wrap input::placeholder {
+  color: transparent !important;
+}
+
+.people-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+}
+
+.person-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  border: 1px solid var(--recetas-border);
+  background: var(--recetas-card-bg);
+  text-decoration: none;
+  overflow: hidden;
+  box-shadow: 0 8px 18px rgba(31, 41, 51, 0.08);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+  min-height: 272px;
+}
+
+.person-card:hover,
+.person-card:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(31, 41, 51, 0.14);
+  border-color: #9ca6af;
+}
+
+.person-card:focus-visible {
+  outline: 2px solid #3b8267;
+  outline-offset: 1px;
+}
+
+.person-card__image-wrap {
+  aspect-ratio: 4 / 3;
+  background: linear-gradient(135deg, var(--recipe-card-color, rgb(118, 161, 146)) 0%, #f2f3ef 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0;
+}
+
+.person-card__image-wrap--has-image {
+  background: transparent;
+}
+
+.recipe-card__swatch {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  border: 0;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.26) 0%, rgba(255, 255, 255, 0.05) 100%);
+}
+
+.recipe-card__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  object-fit: cover;
+  object-position: center;
+}
+
+.person-card__content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.62rem;
+  padding: 0.8rem;
+}
+
+.person-card__title {
+  margin: 0;
+  font-size: 1.04rem;
+  line-height: 1.28;
+  font-weight: 700;
+  color: var(--recetas-text);
+}
+
+.recipe-card__chip-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.recipe-card__chip-label {
+  font-size: 0.71rem;
+  color: var(--recetas-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 700;
+}
+
+.person-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.34rem;
+}
+
+.person-tag {
+  border-radius: 999px;
+  border: 1px solid #cfd6dc;
+  background: #f7f8f9;
+  color: #28414b;
+  font-size: 0.7rem;
+  line-height: 1;
+  padding: 0.22rem 0.5rem;
+  font-weight: 600;
+}
+
+.person-tag--muted {
+  opacity: 0.8;
+}
+
+.people-empty {
+  border: 1px dashed #a6afb8;
+  border-radius: 14px;
+  padding: 2.3rem 1rem;
+  text-align: center;
+  color: #5f6b75;
+  background: #f8f9fa;
+}
+
+@media (max-width: 720px) {
+  #people-title-row {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: nowrap !important;
+    gap: 0.55rem;
+  }
+
+  #people-filter-row {
+    margin-left: auto;
+    width: min(46vw, 220px) !important;
+    max-width: 220px;
+    min-width: 150px;
+  }
+}
