@@ -222,8 +222,8 @@ button#the-list-card-edit-btn:focus-visible {
 }
 
 .recipe-meta-item__icon-wrap {
-  width: 74px;
-  height: 74px;
+  width: 52px !important;
+  height: 52px !important;
   border-radius: 999px;
   border: 1px solid #dbe0e3;
   background: #f5f6f6;
@@ -236,14 +236,14 @@ button#the-list-card-edit-btn:focus-visible {
 }
 
 .recipe-meta-item__icon {
-  width: 46px;
-  height: 46px;
+  width: 28px !important;
+  height: 28px !important;
   display: block;
 }
 
 .recipe-meta-item__icon--img {
-  width: 46px;
-  height: 46px;
+  width: 28px !important;
+  height: 28px !important;
   object-fit: contain;
 }
 
@@ -254,16 +254,16 @@ button#the-list-card-edit-btn:focus-visible {
   min-width: 0;
 }
 
-.recipe-meta-item span {
-  font-size: 0.86rem;
+.recipe-meta-item__content > span {
+  font-size: 0.72rem !important;
   color: #9aa2a9;
   letter-spacing: 0.01em;
   text-transform: none;
   font-weight: 560;
 }
 
-.recipe-meta-item strong {
-  font-size: 2.25rem;
+.recipe-meta-item__value {
+  font-size: 1.5rem !important;
   color: var(--receta-accent);
   font-weight: 760;
   line-height: 1.05;
@@ -1331,18 +1331,22 @@ body.the-list-card-image-crop-open {
   }
 
   .recipe-meta-item__icon-wrap {
-    width: 56px;
-    height: 56px;
+    width: 44px !important;
+    height: 44px !important;
   }
 
   .recipe-meta-item__icon,
   .recipe-meta-item__icon--img {
-    width: 38px;
-    height: 38px;
+    width: 24px !important;
+    height: 24px !important;
   }
 
-  .recipe-meta-item strong {
-    font-size: 1.85rem;
+  .recipe-meta-item__content > span {
+    font-size: 0.68rem !important;
+  }
+
+  .recipe-meta-item__value {
+    font-size: 1.3rem !important;
   }
 
   #recipe-editor-grid {
