@@ -17,6 +17,8 @@
   const SOURCE_CITATION_OPTIONS_ID = "the-list-source-citation-options";
   const PROPOSAL_STATUS_IDS = ["the-list-proposal-status", "the-list-card-proposal-status", "recipe-page-status"];
   const VERIFY_STATUS_PATTERN = /receta marcada como (verificada|sin verificar)/i;
+  const CREATE_RECIPE_STATUS_PATTERN = /receta creada/i;
+  const RECETAS_LIST_CREATED_URL = "/recetas?created_recipe=1";
   const TOAST_ROOT_ID = "the-list-toast-root";
   const TOAST_HIDE_DELAY_MS = 4200;
   const TOAST_REMOVE_DELAY_MS = 4700;
@@ -108,6 +110,7 @@
   let lastCompiledPreviewMarkdown = "";
   let recipeIngredientItemCounter = 0;
   let recipeStepItemCounter = 0;
+  let createdRecipeRedirectTriggered = false;
 
   const getCropDebugStore = () => {
     const key = "__theListCropDebugLogs";
@@ -2620,6 +2623,12 @@
     const slug = String(badge.getAttribute("data-slug") || "").trim().toLowerCase();
     const currentState = isTrueish(badge.getAttribute("data-state"));
     const nextState = !currentState;
+    badge.setAttribute("data-state", nextState ? "true" : "false");
+    badge.classList.toggle("is-verified", nextState);
+    badge.classList.toggle("is-unverified", !nextState);
+    const badgeLabel = nextState ? "Receta verificada" : "Receta sin verificar";
+    badge.setAttribute("aria-label", badgeLabel);
+    badge.setAttribute("title", badgeLabel);
     const payload = JSON.stringify({ slug, nextState });
     setComponentValue(DETAIL_VERIFY_PAYLOAD_ID, payload);
     setComponentValue(DETAIL_VERIFY_STATE_ID, nextState ? "true" : "false");
@@ -4771,7 +4780,17 @@
         if (!message || message === lastMessage) return;
         lastMessage = message;
         if (!message.startsWith("✅")) return;
-        if (statusId === "recipe-page-status" && !VERIFY_STATUS_PATTERN.test(message)) return;
+        if (statusId === "recipe-page-status") {
+          if (CREATE_RECIPE_STATUS_PATTERN.test(message)) {
+            clearStatusMessage(statusNode);
+            if (!createdRecipeRedirectTriggered) {
+              createdRecipeRedirectTriggered = true;
+              window.location.assign(RECETAS_LIST_CREATED_URL);
+            }
+            return;
+          }
+          if (!VERIFY_STATUS_PATTERN.test(message)) return;
+        }
         showSuccessToast(message);
         clearStatusMessage(statusNode);
         if (statusId !== "recipe-page-status") {

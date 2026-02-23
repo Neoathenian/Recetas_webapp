@@ -706,14 +706,15 @@ def _toggle_recipe_verified_from_detail(
     next_value = _is_truthy(payload.get("nextState")) if has_next_state else _is_truthy(recipe_verified_state)
 
     current_slug_raw = str(current_slug or "").strip()
-    payload_slug = str(payload.get("slug") or "").strip()
-    resolved_slug = payload_slug or current_slug_raw
-    if resolved_slug == NEW_RECIPE_SENTINEL:
+    if current_slug_raw == NEW_RECIPE_SENTINEL:
         return (
             gr.update(),
-            gr.update(value="ℹ️ Esta verificación se guardará cuando crees la receta.", visible=True),
+            gr.update(value="", visible=False),
             gr.update(value=_bool_state(next_value)),
         )
+
+    payload_slug = str(payload.get("slug") or "").strip()
+    resolved_slug = payload_slug or current_slug_raw
     if not resolved_slug:
         return (
             gr.update(),

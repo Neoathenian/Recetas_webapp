@@ -14,6 +14,7 @@
   const TOAST_HIDE_DELAY_MS = 4200;
   const TOAST_REMOVE_DELAY_MS = 4700;
   const ALL_VALUE = "all";
+  const CREATED_RECIPE_QUERY_PARAM = "created_recipe";
 
   const ensureRoot = () => {
     if (typeof window.gradioApp === "function") {
@@ -29,6 +30,7 @@
   };
 
   const normalizeValue = (value) => String(value || "").trim().toLowerCase();
+  const TRUE_VALUES = new Set(["1", "true", "yes", "on"]);
   const isAllValue = (value) => normalizeValue(value) === ALL_VALUE;
 
   const dedupeValues = (values) => {
@@ -78,6 +80,32 @@
     window.setTimeout(() => {
       toast.remove();
     }, TOAST_REMOVE_DELAY_MS);
+  };
+
+  let createdRecipeToastHandled = false;
+
+  const maybeShowCreatedRecipeToast = () => {
+    if (createdRecipeToastHandled) return;
+    let url;
+    try {
+      url = new URL(window.location.href);
+    } catch (error) {
+      void error;
+      return;
+    }
+
+    const rawParam = url.searchParams.get(CREATED_RECIPE_QUERY_PARAM);
+    if (rawParam === null) return;
+
+    createdRecipeToastHandled = true;
+    if (TRUE_VALUES.has(normalizeValue(rawParam))) {
+      showSuccessToast("Receta creada correctamente.");
+    }
+
+    url.searchParams.delete(CREATED_RECIPE_QUERY_PARAM);
+    const nextSearch = url.searchParams.toString();
+    const nextUrl = `${url.pathname}${nextSearch ? `?${nextSearch}` : ""}${url.hash || ""}`;
+    window.history.replaceState(window.history.state, "", nextUrl);
   };
 
   const parseValues = (scope) => {
@@ -674,6 +702,7 @@
   };
 
   const bootstrap = () => {
+    maybeShowCreatedRecipeToast();
     DROPDOWN_CONFIGS.forEach((config) => bindDropdown(config));
     bindCreateTrigger();
     bindVerifiedToggle();
