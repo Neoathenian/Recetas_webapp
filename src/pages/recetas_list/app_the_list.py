@@ -40,6 +40,10 @@ ASSETS_DIR = Path(__file__).resolve().parent
 CSS_PATH = ASSETS_DIR / "css" / "the_list_page.css"
 TAG_FILTER_JS_PATH = ASSETS_DIR / "js" / "the_list_tag_filter.js"
 VERIFIED_ONLY_BUTTON_LABEL = "Solo"
+VIEW_MODE_ICON = "icon"
+VIEW_MODE_LIST = "list"
+VIEW_MODE_ICON_LABEL = "Iconos"
+VIEW_MODE_LIST_LABEL = "Lista"
 
 
 def _log_timing(event_name: str, start: float, **fields: object) -> None:
@@ -70,10 +74,28 @@ def _load_tag_filter_js() -> str:
     return f"<script>\n{script}\n</script>"
 
 
-def _render_cards(recipes: Sequence[Dict[str, object]]) -> str:
+def _normalize_view_mode(value: object) -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized == VIEW_MODE_LIST:
+        return VIEW_MODE_LIST
+    return VIEW_MODE_ICON
+
+
+def _compact_values_text(values: object, *, empty_label: str) -> str:
+    if isinstance(values, (list, tuple, set)):
+        normalized_values = [str(value or "").strip() for value in values if str(value or "").strip()]
+    else:
+        normalized_values = []
+    if not normalized_values:
+        return html.escape(empty_label)
+    return html.escape(", ".join(normalized_values))
+
+
+def _render_cards(recipes: Sequence[Dict[str, object]], view_mode: object = VIEW_MODE_ICON) -> str:
     if not recipes:
         return '<div class="people-empty">Aún no hay recetas disponibles.</div>'
 
+    normalized_view_mode = _normalize_view_mode(view_mode)
     cards: List[str] = []
     for row in recipes:
         name = html.escape(str(row.get("name") or "Receta"))
@@ -81,10 +103,11 @@ def _render_cards(recipes: Sequence[Dict[str, object]]) -> str:
         href = f"/receta/?slug={quote(slug, safe='-')}"
         is_verified = bool(row.get("verified"))
         verified_class = "is-verified" if is_verified else "is-unverified"
+        verified_list_class = " recipe-card__verified--list" if normalized_view_mode == VIEW_MODE_LIST else ""
         verified_label = "Receta verificada" if is_verified else "Receta sin verificar"
         safe_slug = html.escape(slug, quote=True)
         verified_badge = (
-            f'<span class="recipe-card__verified {verified_class}" '
+            f'<span class="recipe-card__verified{verified_list_class} {verified_class}" '
             f'role="button" aria-label="{verified_label}" title="{verified_label}" '
             f'data-slug="{safe_slug}" data-state="{"true" if is_verified else "false"}" tabindex="0"></span>'
         )
@@ -93,10 +116,28 @@ def _render_cards(recipes: Sequence[Dict[str, object]]) -> str:
         card_image_file = str(row.get("card_image_file") or "").strip()
         card_image_src = html.escape(card_image_file, quote=True) if card_image_file else ""
 
-        tag_values = [_normalize_tag(str(tag)) for tag in row.get("tags", []) if str(tag).strip()]
-        tags_markup = _render_tag_chips(row.get("tags", []), empty_label="sin-etiquetas")
-        tools_markup = _render_tag_chips(row.get("tools", []), empty_label="sin-herramientas")
+        tags_raw = row.get("tags", [])
+        tools_raw = row.get("tools", [])
+        tag_values = [_normalize_tag(str(tag)) for tag in tags_raw if str(tag).strip()]
+        tags_markup = _render_tag_chips(tags_raw, empty_label="sin-etiquetas")
+        tools_markup = _render_tag_chips(tools_raw, empty_label="sin-herramientas")
+        tags_list_text = _compact_values_text(tags_raw, empty_label="sin etiquetas")
+        tools_list_text = _compact_values_text(tools_raw, empty_label="sin herramientas")
         tags_json_attr = html.escape(json.dumps(tag_values, ensure_ascii=True), quote=True)
+
+        if normalized_view_mode == VIEW_MODE_LIST:
+            cards.append(
+                f"""
+                <a class="recipe-list-row" href="{href}" data-tags-json="{tags_json_attr}">
+                  <span class="recipe-list-row__cell recipe-list-row__cell--name">{name}</span>
+                  <span class="recipe-list-row__cell recipe-list-row__cell--tags">{tags_list_text}</span>
+                  <span class="recipe-list-row__cell recipe-list-row__cell--tools">{tools_list_text}</span>
+                  <span class="recipe-list-row__verify">{verified_badge}</span>
+                </a>
+                """.strip()
+            )
+            continue
+
         image_wrap_class = "person-card__image-wrap"
         media_markup = "<div class='recipe-card__swatch' aria-hidden='true'></div>"
         if card_image_src:
@@ -125,7 +166,20 @@ def _render_cards(recipes: Sequence[Dict[str, object]]) -> str:
             """.strip()
         )
 
-    return f'<div class="people-grid">{"".join(cards)}</div>'
+    grid_classes = "people-grid"
+    if normalized_view_mode == VIEW_MODE_LIST:
+        return (
+            '<div class="recipe-list-table" data-view-mode="list">'
+            '<div class="recipe-list-table__header" aria-hidden="true">'
+            '<span class="recipe-list-table__head recipe-list-table__head--name">Receta</span>'
+            '<span class="recipe-list-table__head">Etiquetas</span>'
+            '<span class="recipe-list-table__head">Herramientas</span>'
+            '<span class="recipe-list-table__head recipe-list-table__head--verify">Verificado</span>'
+            "</div>"
+            f'<div class="recipe-list-table__body">{"".join(cards)}</div>'
+            "</div>"
+        )
+    return f'<div class="{grid_classes}" data-view-mode="{normalized_view_mode}">{"".join(cards)}</div>'
 
 
 def _resolve_next_filter_selection(
@@ -239,6 +293,7 @@ def _render_cards_for_current_filters(
     current_tool_selection: Sequence[object] | None,
     search_query: object,
     only_verified: object,
+    view_mode: object,
 ):
     recipes = _fetch_all_people()
     filtered_rows = _apply_recipe_filters(
@@ -248,7 +303,7 @@ def _render_cards_for_current_filters(
         search_query,
         only_verified=only_verified,
     )
-    return gr.update(value=_render_cards(filtered_rows), visible=True)
+    return gr.update(value=_render_cards(filtered_rows, view_mode=view_mode), visible=True)
 
 
 def _verified_only_button_update(only_verified: object) -> gr.update:
@@ -259,11 +314,91 @@ def _verified_only_button_update(only_verified: object) -> gr.update:
     )
 
 
+def _view_mode_button_update(current_mode: object, *, target_mode: str, label: str) -> gr.update:
+    normalized_mode = _normalize_view_mode(current_mode)
+    return gr.update(
+        value=label,
+        variant="primary" if normalized_mode == target_mode else "secondary",
+    )
+
+
+def _view_mode_button_updates(current_mode: object) -> tuple[gr.update, gr.update]:
+    normalized_mode = _normalize_view_mode(current_mode)
+    return (
+        _view_mode_button_update(
+            normalized_mode,
+            target_mode=VIEW_MODE_ICON,
+            label=VIEW_MODE_ICON_LABEL,
+        ),
+        _view_mode_button_update(
+            normalized_mode,
+            target_mode=VIEW_MODE_LIST,
+            label=VIEW_MODE_LIST_LABEL,
+        ),
+    )
+
+
+def _set_recipe_view_mode(
+    next_view_mode: str,
+    current_tag_selection: Sequence[object] | None,
+    current_tool_selection: Sequence[object] | None,
+    search_query: str,
+    current_only_verified: object,
+):
+    total_start = time.perf_counter()
+    normalized_view_mode = _normalize_view_mode(next_view_mode)
+    cards_update = _render_cards_for_current_filters(
+        current_tag_selection=current_tag_selection,
+        current_tool_selection=current_tool_selection,
+        search_query=search_query,
+        only_verified=current_only_verified,
+        view_mode=normalized_view_mode,
+    )
+    icon_button_update, list_button_update = _view_mode_button_updates(normalized_view_mode)
+    _log_timing(
+        "set_recipe_view_mode.total",
+        total_start,
+        view_mode=normalized_view_mode,
+    )
+    return normalized_view_mode, icon_button_update, list_button_update, cards_update
+
+
+def _switch_to_icon_view(
+    current_tag_selection: Sequence[object] | None,
+    current_tool_selection: Sequence[object] | None,
+    search_query: str,
+    current_only_verified: object,
+):
+    return _set_recipe_view_mode(
+        VIEW_MODE_ICON,
+        current_tag_selection=current_tag_selection,
+        current_tool_selection=current_tool_selection,
+        search_query=search_query,
+        current_only_verified=current_only_verified,
+    )
+
+
+def _switch_to_list_view(
+    current_tag_selection: Sequence[object] | None,
+    current_tool_selection: Sequence[object] | None,
+    search_query: str,
+    current_only_verified: object,
+):
+    return _set_recipe_view_mode(
+        VIEW_MODE_LIST,
+        current_tag_selection=current_tag_selection,
+        current_tool_selection=current_tool_selection,
+        search_query=search_query,
+        current_only_verified=current_only_verified,
+    )
+
+
 def _toggle_verified_only_filter(
     current_only_verified: object,
     current_tag_selection: Sequence[object] | None,
     current_tool_selection: Sequence[object] | None,
     search_query: str,
+    current_view_mode: object,
 ):
     total_start = time.perf_counter()
     next_only_verified = not _is_truthy(current_only_verified)
@@ -272,6 +407,7 @@ def _toggle_verified_only_filter(
         current_tool_selection=current_tool_selection,
         search_query=search_query,
         only_verified=next_only_verified,
+        view_mode=current_view_mode,
     )
     button_update = _verified_only_button_update(next_only_verified)
     _log_timing(
@@ -288,6 +424,7 @@ def _toggle_recipe_verified_from_list(
     current_tool_selection: Sequence[object] | None,
     search_query: str,
     current_only_verified: object,
+    current_view_mode: object,
 ):
     total_start = time.perf_counter()
     try:
@@ -310,6 +447,7 @@ def _toggle_recipe_verified_from_list(
         current_tool_selection=current_tool_selection,
         search_query=search_query,
         only_verified=current_only_verified,
+        view_mode=current_view_mode,
     )
     _log_timing(
         "toggle_recipe_verified_from_list.total",
@@ -327,6 +465,7 @@ def _update_people_cards_by_filters(
     previous_tool_selection: Sequence[object] | None,
     search_query: str,
     current_only_verified: object,
+    current_view_mode: object,
 ):
     total_start = time.perf_counter()
 
@@ -354,7 +493,7 @@ def _update_people_cards_by_filters(
         search_query,
         only_verified=current_only_verified,
     )
-    cards_update = gr.update(value=_render_cards(filtered_rows), visible=True)
+    cards_update = gr.update(value=_render_cards(filtered_rows, view_mode=current_view_mode), visible=True)
 
     _log_timing(
         "update_filters.total",
@@ -385,6 +524,7 @@ def _load_the_list_page(request: gr.Request):
         selected_tags = _parse_tag_query_values(_query_param(request, "tag"))
         selected_tools = _parse_tag_query_values(_query_param(request, "tool"))
         search_query = _query_param(request, "q") or _query_param(request, "search")
+        view_mode = _normalize_view_mode(_query_param(request, "view"))
         only_verified = True
         tag_filter_update, _tag_filter_choices, tag_filter_selection = _build_tag_filter_update(
             recipes,
@@ -403,7 +543,8 @@ def _load_the_list_page(request: gr.Request):
             search_query,
             only_verified=only_verified,
         )
-        cards_html = _render_cards(filtered_rows)
+        cards_html = _render_cards(filtered_rows, view_mode=view_mode)
+        icon_view_button_update, list_view_button_update = _view_mode_button_updates(view_mode)
 
         _log_timing(
             "load_recetas.total",
@@ -420,7 +561,10 @@ def _load_the_list_page(request: gr.Request):
             gr.update(visible=True),
             gr.update(value=search_query),
             _verified_only_button_update(only_verified),
+            icon_view_button_update,
+            list_view_button_update,
             only_verified,
+            view_mode,
             tag_filter_update,
             tag_filter_selection,
             tool_filter_update,
@@ -434,7 +578,18 @@ def _load_the_list_page(request: gr.Request):
             gr.update(visible=False),
             gr.update(value=""),
             _verified_only_button_update(True),
+            _view_mode_button_update(
+                VIEW_MODE_ICON,
+                target_mode=VIEW_MODE_ICON,
+                label=VIEW_MODE_ICON_LABEL,
+            ),
+            _view_mode_button_update(
+                VIEW_MODE_ICON,
+                target_mode=VIEW_MODE_LIST,
+                label=VIEW_MODE_LIST_LABEL,
+            ),
             True,
+            VIEW_MODE_ICON,
             gr.update(choices=[(TAG_FILTER_ALL_OPTION, TAG_FILTER_ALL_OPTION)], value=[], interactive=True),
             [],
             gr.update(choices=[(TOOL_FILTER_ALL_OPTION, TOOL_FILTER_ALL_OPTION)], value=[], interactive=True),
@@ -503,10 +658,25 @@ def make_the_list_app() -> gr.Blocks:
                         scale=0,
                         min_width=98,
                     )
+                    view_icon_toggle = gr.Button(
+                        VIEW_MODE_ICON_LABEL,
+                        variant="primary",
+                        elem_id="people-view-icon-toggle",
+                        scale=0,
+                        min_width=42,
+                    )
+                    view_list_toggle = gr.Button(
+                        VIEW_MODE_LIST_LABEL,
+                        variant="secondary",
+                        elem_id="people-view-list-toggle",
+                        scale=0,
+                        min_width=42,
+                    )
 
             tag_filter_selection_state = gr.State([])
             tool_filter_selection_state = gr.State([])
             verified_only_state = gr.State(True)
+            view_mode_state = gr.State(VIEW_MODE_ICON)
             cards_html = gr.HTML(elem_id="people-cards")
             verify_payload = gr.Textbox(
                 value="",
@@ -529,7 +699,10 @@ def make_the_list_app() -> gr.Blocks:
                 tag_filter_row,
                 search_box,
                 verified_only_toggle,
+                view_icon_toggle,
+                view_list_toggle,
                 verified_only_state,
+                view_mode_state,
                 tag_filter,
                 tag_filter_selection_state,
                 tool_filter,
@@ -553,6 +726,7 @@ def make_the_list_app() -> gr.Blocks:
                 tool_filter_selection_state,
                 search_box,
                 verified_only_state,
+                view_mode_state,
             ],
             outputs=[tag_filter, tag_filter_selection_state, tool_filter, tool_filter_selection_state, cards_html],
             show_progress=False,
@@ -566,6 +740,7 @@ def make_the_list_app() -> gr.Blocks:
                 tool_filter_selection_state,
                 search_box,
                 verified_only_state,
+                view_mode_state,
             ],
             outputs=[tag_filter, tag_filter_selection_state, tool_filter, tool_filter_selection_state, cards_html],
             show_progress=False,
@@ -579,6 +754,7 @@ def make_the_list_app() -> gr.Blocks:
                 tool_filter_selection_state,
                 search_box,
                 verified_only_state,
+                view_mode_state,
             ],
             outputs=[tag_filter, tag_filter_selection_state, tool_filter, tool_filter_selection_state, cards_html],
             show_progress=False,
@@ -589,8 +765,28 @@ def make_the_list_app() -> gr.Blocks:
                 _toggle_verified_only_filter,
                 label="toggle_verified_only_filter",
             ),
-            inputs=[verified_only_state, tag_filter, tool_filter, search_box],
+            inputs=[verified_only_state, tag_filter, tool_filter, search_box, view_mode_state],
             outputs=[verified_only_state, verified_only_toggle, cards_html],
+            show_progress=False,
+        )
+        view_icon_toggle.click(
+            timed_page_load(
+                "/recetas",
+                _switch_to_icon_view,
+                label="switch_to_icon_view",
+            ),
+            inputs=[tag_filter, tool_filter, search_box, verified_only_state],
+            outputs=[view_mode_state, view_icon_toggle, view_list_toggle, cards_html],
+            show_progress=False,
+        )
+        view_list_toggle.click(
+            timed_page_load(
+                "/recetas",
+                _switch_to_list_view,
+                label="switch_to_list_view",
+            ),
+            inputs=[tag_filter, tool_filter, search_box, verified_only_state],
+            outputs=[view_mode_state, view_icon_toggle, view_list_toggle, cards_html],
             show_progress=False,
         )
         verify_trigger.click(
@@ -599,7 +795,7 @@ def make_the_list_app() -> gr.Blocks:
                 _toggle_recipe_verified_from_list,
                 label="toggle_recipe_verified_from_list",
             ),
-            inputs=[verify_payload, tag_filter, tool_filter, search_box, verified_only_state],
+            inputs=[verify_payload, tag_filter, tool_filter, search_box, verified_only_state, view_mode_state],
             outputs=[cards_html],
             show_progress=False,
         )
