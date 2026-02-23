@@ -2624,6 +2624,21 @@
     setComponentValue(DETAIL_VERIFY_PAYLOAD_ID, payload);
     setComponentValue(DETAIL_VERIFY_STATE_ID, nextState ? "true" : "false");
 
+    const shell = document.getElementById(CARD_PROPOSAL_SHELL_ID);
+    const row = getCardProposalActionsRow();
+    const slot = getCardInlineActionsSlot();
+    if (
+      isElementVisible(shell) &&
+      row instanceof HTMLElement &&
+      shell instanceof HTMLElement &&
+      slot instanceof HTMLElement &&
+      row.parentElement === slot
+    ) {
+      // Keep action buttons mounted while the hero HTML gets replaced.
+      shell.appendChild(row);
+      row.classList.remove("the-list-card-actions--inline");
+    }
+
     const triggerHost = document.getElementById(DETAIL_VERIFY_TRIGGER_ID);
     const trigger = resolveButtonClickHost(triggerHost);
     if (!(trigger instanceof HTMLElement)) return;
