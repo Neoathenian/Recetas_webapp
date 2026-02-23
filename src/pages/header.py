@@ -487,6 +487,7 @@ def _header_html(user: Optional[dict], path: str, request: Any) -> str:
     <span class="account-caret" aria-hidden="true"></span>
   </summary>
   <div class="account-dropdown" role="menu">
+    <a href="/profile/" role="menuitem" class="menu-link">Perfil</a>
     <a href="/logout" role="menuitem" class="menu-link">Cerrar sesión</a>
   </div>
 </details>""".strip()

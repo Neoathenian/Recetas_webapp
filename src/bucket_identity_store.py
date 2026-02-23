@@ -15,6 +15,10 @@ logger = logging.getLogger(__name__)
 PRIVILEGE_FIELDS: tuple[str, ...] = ("base_user", "reviewer", "editor", "admin", "creator")
 USERS_PREFIX = (os.getenv("RECETAS_USERS_PREFIX") or "app/users").strip("/ ")
 PRIVILEGES_PREFIX = (os.getenv("RECETAS_PRIVILEGES_PREFIX") or "app/privileges").strip("/ ")
+USER_PREFERENCES_PREFIX = (os.getenv("RECETAS_USER_PREFERENCES_PREFIX") or "app/user_preferences").strip("/ ")
+
+RECETAS_VIEW_MODE_ICON = "icon"
+RECETAS_VIEW_MODE_LIST = "list"
 
 
 def _utc_now_iso() -> str:
@@ -47,6 +51,10 @@ def _user_blob_name(email: str) -> str:
 
 def _privileges_blob_name(email: str) -> str:
     return f"{PRIVILEGES_PREFIX}/{_email_blob_key(email)}.json"
+
+
+def _user_preferences_blob_name(email: str) -> str:
+    return f"{USER_PREFERENCES_PREFIX}/{_email_blob_key(email)}.json"
 
 
 def _download_json_blob(blob_name: str) -> Dict[str, object] | None:
@@ -95,6 +103,67 @@ def _iter_json_blobs(prefix: str) -> Iterable[str]:
 
 def empty_privileges() -> Dict[str, bool]:
     return {name: False for name in PRIVILEGE_FIELDS}
+
+
+def _is_truthy(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on", "si", "sí"}
+
+
+def _normalize_recetas_view_mode(value: object) -> str:
+    if str(value or "").strip().lower() == RECETAS_VIEW_MODE_LIST:
+        return RECETAS_VIEW_MODE_LIST
+    return RECETAS_VIEW_MODE_ICON
+
+
+def empty_user_preferences() -> Dict[str, object]:
+    return {
+        "recetas_view_mode": RECETAS_VIEW_MODE_ICON,
+        "recetas_only_verified": True,
+    }
+
+
+def get_user_preferences(email: str | None) -> Dict[str, object]:
+    normalized_email = _normalize_email(email)
+    preferences = empty_user_preferences()
+    if not normalized_email:
+        return preferences
+
+    raw = _download_json_blob(_user_preferences_blob_name(normalized_email)) or {}
+    preferences["recetas_view_mode"] = _normalize_recetas_view_mode(raw.get("recetas_view_mode"))
+    preferences["recetas_only_verified"] = _is_truthy(raw.get("recetas_only_verified", True))
+    return preferences
+
+
+def set_user_preferences(
+    email: str,
+    *,
+    recetas_view_mode: object | None = None,
+    recetas_only_verified: object | None = None,
+) -> Dict[str, object]:
+    normalized_email = _normalize_email(email)
+    if not normalized_email:
+        raise ValueError("El correo es obligatorio para guardar preferencias.")
+
+    current = get_user_preferences(normalized_email)
+    if recetas_view_mode is not None:
+        current["recetas_view_mode"] = _normalize_recetas_view_mode(recetas_view_mode)
+    if recetas_only_verified is not None:
+        current["recetas_only_verified"] = _is_truthy(recetas_only_verified)
+
+    existing = _download_json_blob(_user_preferences_blob_name(normalized_email)) or {}
+    created_at = str(existing.get("created_at") or "").strip() or _utc_now_iso()
+    payload: Dict[str, object] = {
+        "email": normalized_email,
+        "created_at": created_at,
+        "updated_at": _utc_now_iso(),
+    }
+    payload.update(current)
+    _upload_json_blob(_user_preferences_blob_name(normalized_email), payload)
+    return current
 
 
 def get_user_privileges(email: str | None) -> Dict[str, bool]:

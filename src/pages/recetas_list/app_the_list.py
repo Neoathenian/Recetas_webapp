@@ -10,6 +10,8 @@ from urllib.parse import quote
 
 import gradio as gr
 
+from src.bucket_identity_store import get_user_preferences
+from src.login_logic import get_user
 from src.page_timing import timed_page_load
 from src.pages.header import render_header, with_light_mode_head
 from src.pages.recetas_list.core_the_list import (
@@ -524,8 +526,20 @@ def _load_the_list_page(request: gr.Request):
         selected_tags = _parse_tag_query_values(_query_param(request, "tag"))
         selected_tools = _parse_tag_query_values(_query_param(request, "tool"))
         search_query = _query_param(request, "q") or _query_param(request, "search")
-        view_mode = _normalize_view_mode(_query_param(request, "view"))
-        only_verified = True
+        raw_view_mode = _query_param(request, "view")
+        raw_only_verified = _query_param(request, "solo")
+
+        default_view_mode = VIEW_MODE_ICON
+        default_only_verified = True
+        user = get_user(request, refresh_privileges=False) or {}
+        user_email = str((user or {}).get("email") or "").strip().lower()
+        if user_email:
+            preferences = get_user_preferences(user_email)
+            default_view_mode = _normalize_view_mode(preferences.get("recetas_view_mode"))
+            default_only_verified = _is_truthy(preferences.get("recetas_only_verified"))
+
+        view_mode = _normalize_view_mode(raw_view_mode or default_view_mode)
+        only_verified = _is_truthy(raw_only_verified) if raw_only_verified else default_only_verified
         tag_filter_update, _tag_filter_choices, tag_filter_selection = _build_tag_filter_update(
             recipes,
             selected_tags,

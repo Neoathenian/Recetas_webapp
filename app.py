@@ -66,6 +66,7 @@ from src.mount_gradio_app import mount_gradio_app
 from src.pages.recetas_list.app_the_list import make_the_list_app
 from src.pages.recetas_display.app_people_display import make_people_display_app
 from src.pages.privileges.app_privileges import make_privileges_app
+from src.pages.profile.app_profile import make_profile_app
 
 from src.gcs_storage import blob_http_metadata, download_bytes
 
@@ -290,6 +291,7 @@ async def media_blob(blob_path: str, request: Request) -> Response:
 the_list_app   = make_the_list_app()
 people_display_app = make_people_display_app()
 privileges_app = make_privileges_app()
+profile_app = make_profile_app()
 login_page     = make_login_page()
 
 review_display_app = _make_bucket_notice_app(
@@ -318,6 +320,7 @@ mount_gradio_app(app, people_display_app,  "/receta", secret_key=session_secret)
 mount_gradio_app(app, review_display_app, "/review", secret_key=session_secret)
 mount_gradio_app(app, admin_app,         "/admin", secret_key=session_secret)
 mount_gradio_app(app, privileges_app,   "/privileges", secret_key=session_secret)
+mount_gradio_app(app, profile_app,      "/profile", secret_key=session_secret)
 
 
 @app.get("/people")
