@@ -232,10 +232,28 @@ button#the-list-card-edit-btn:focus-visible {
   overflow: visible;
 }
 
+.person-detail-card__title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.person-detail-card__title-actions-slot {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
 .person-detail-card__title {
   margin: 0;
   color: var(--receta-text);
   font-size: clamp(1.3rem, 1rem + 1vw, 1.9rem);
+}
+
+.person-detail-card__title.person-detail-card__field--active {
+  display: inline-block;
+  width: fit-content;
+  max-width: 100%;
 }
 
 .person-detail-card__bucket {
