@@ -196,6 +196,73 @@ button#the-list-create-profile-trigger:focus-visible {
   box-shadow: 0 0 0 2px rgba(75, 122, 102, 0.15) !important;
 }
 
+#people-verified-only-toggle {
+  align-self: flex-end;
+  flex: 0 0 auto !important;
+  min-width: 0 !important;
+}
+
+#people-verified-only-toggle button,
+button#people-verified-only-toggle {
+  min-width: 98px !important;
+  height: 42px !important;
+  border-radius: 10px !important;
+  padding: 0 0.85rem !important;
+  border: 1px solid #c2c8cf !important;
+  background-color: #e5e7eb !important;
+  color: #344054 !important;
+  font-size: 0.9rem !important;
+  font-weight: 650 !important;
+  line-height: 1 !important;
+  box-shadow: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.4rem !important;
+}
+
+#people-verified-only-toggle button::after,
+button#people-verified-only-toggle::after {
+  content: "";
+  width: 1.05rem;
+  height: 1.05rem;
+  background-image: url("/images/filled-checkmark.png");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+}
+
+#people-verified-only-toggle.primary button,
+#people-verified-only-toggle button.primary,
+#people-verified-only-toggle.primary,
+button#people-verified-only-toggle.primary {
+  border-color: #237a4d !important;
+  background-color: #2f9e68 !important;
+  color: #ffffff !important;
+}
+
+#people-verified-only-toggle.primary button::after,
+#people-verified-only-toggle button.primary::after,
+button#people-verified-only-toggle.primary::after {
+  filter: brightness(0) invert(1);
+}
+
+#people-verified-only-toggle.secondary button,
+#people-verified-only-toggle button.secondary,
+#people-verified-only-toggle.secondary,
+button#people-verified-only-toggle.secondary {
+  border-color: #c2c8cf !important;
+  background-color: #e5e7eb !important;
+  color: #344054 !important;
+}
+
+#people-verified-only-toggle button:hover,
+#people-verified-only-toggle button:focus-visible,
+button#people-verified-only-toggle:hover,
+button#people-verified-only-toggle:focus-visible {
+  box-shadow: 0 0 0 2px rgba(47, 158, 104, 0.2) !important;
+}
+
 .people-grid {
   display: grid;
   gap: 1rem;
@@ -461,5 +528,10 @@ button#the-list-create-profile-trigger:focus-visible {
 
   #the-list-create-profile-trigger {
     margin-left: auto;
+  }
+
+  #people-verified-only-toggle button,
+  button#people-verified-only-toggle {
+    min-width: 90px !important;
   }
 }

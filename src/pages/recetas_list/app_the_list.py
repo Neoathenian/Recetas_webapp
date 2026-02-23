@@ -39,6 +39,7 @@ timing_logger = logging.getLogger("uvicorn.error")
 ASSETS_DIR = Path(__file__).resolve().parent
 CSS_PATH = ASSETS_DIR / "css" / "the_list_page.css"
 TAG_FILTER_JS_PATH = ASSETS_DIR / "js" / "the_list_tag_filter.js"
+VERIFIED_ONLY_BUTTON_LABEL = "Solo"
 
 
 def _log_timing(event_name: str, start: float, **fields: object) -> None:
@@ -203,15 +204,26 @@ def _filter_people_for_search_query(
     return filtered_rows
 
 
+def _filter_people_for_verified_selection(
+    recipes: Sequence[Dict[str, object]],
+    only_verified: object,
+) -> List[Dict[str, object]]:
+    if not _is_truthy(only_verified):
+        return list(recipes)
+    return [row for row in recipes if bool(row.get("verified"))]
+
+
 def _apply_recipe_filters(
     recipes: Sequence[Dict[str, object]],
     tag_selection: Sequence[object] | None,
     tool_selection: Sequence[object] | None,
     search_query: object = "",
+    only_verified: object = True,
 ) -> List[Dict[str, object]]:
     tag_filtered_rows = _filter_people_for_tag_selection(recipes, tag_selection)
     tool_filtered_rows = _filter_people_for_tool_selection(tag_filtered_rows, tool_selection)
-    return _filter_people_for_search_query(tool_filtered_rows, search_query)
+    search_filtered_rows = _filter_people_for_search_query(tool_filtered_rows, search_query)
+    return _filter_people_for_verified_selection(search_filtered_rows, only_verified)
 
 
 def _is_truthy(value: object) -> bool:
@@ -226,10 +238,48 @@ def _render_cards_for_current_filters(
     current_tag_selection: Sequence[object] | None,
     current_tool_selection: Sequence[object] | None,
     search_query: object,
+    only_verified: object,
 ):
     recipes = _fetch_all_people()
-    filtered_rows = _apply_recipe_filters(recipes, current_tag_selection, current_tool_selection, search_query)
+    filtered_rows = _apply_recipe_filters(
+        recipes,
+        current_tag_selection,
+        current_tool_selection,
+        search_query,
+        only_verified=only_verified,
+    )
     return gr.update(value=_render_cards(filtered_rows), visible=True)
+
+
+def _verified_only_button_update(only_verified: object) -> gr.update:
+    enabled = _is_truthy(only_verified)
+    return gr.update(
+        value=VERIFIED_ONLY_BUTTON_LABEL,
+        variant="primary" if enabled else "secondary",
+    )
+
+
+def _toggle_verified_only_filter(
+    current_only_verified: object,
+    current_tag_selection: Sequence[object] | None,
+    current_tool_selection: Sequence[object] | None,
+    search_query: str,
+):
+    total_start = time.perf_counter()
+    next_only_verified = not _is_truthy(current_only_verified)
+    cards_update = _render_cards_for_current_filters(
+        current_tag_selection=current_tag_selection,
+        current_tool_selection=current_tool_selection,
+        search_query=search_query,
+        only_verified=next_only_verified,
+    )
+    button_update = _verified_only_button_update(next_only_verified)
+    _log_timing(
+        "toggle_verified_only_filter.total",
+        total_start,
+        only_verified=next_only_verified,
+    )
+    return next_only_verified, button_update, cards_update
 
 
 def _toggle_recipe_verified_from_list(
@@ -237,6 +287,7 @@ def _toggle_recipe_verified_from_list(
     current_tag_selection: Sequence[object] | None,
     current_tool_selection: Sequence[object] | None,
     search_query: str,
+    current_only_verified: object,
 ):
     total_start = time.perf_counter()
     try:
@@ -258,6 +309,7 @@ def _toggle_recipe_verified_from_list(
         current_tag_selection=current_tag_selection,
         current_tool_selection=current_tool_selection,
         search_query=search_query,
+        only_verified=current_only_verified,
     )
     _log_timing(
         "toggle_recipe_verified_from_list.total",
@@ -274,6 +326,7 @@ def _update_people_cards_by_filters(
     current_tool_selection: Sequence[object] | None,
     previous_tool_selection: Sequence[object] | None,
     search_query: str,
+    current_only_verified: object,
 ):
     total_start = time.perf_counter()
 
@@ -294,7 +347,13 @@ def _update_people_cards_by_filters(
         all_option=TOOL_FILTER_ALL_OPTION,
     )
 
-    filtered_rows = _apply_recipe_filters(recipes, next_tag_selection, next_tool_selection, search_query)
+    filtered_rows = _apply_recipe_filters(
+        recipes,
+        next_tag_selection,
+        next_tool_selection,
+        search_query,
+        only_verified=current_only_verified,
+    )
     cards_update = gr.update(value=_render_cards(filtered_rows), visible=True)
 
     _log_timing(
@@ -302,6 +361,7 @@ def _update_people_cards_by_filters(
         total_start,
         selected_tags=len(next_tag_selection),
         selected_tools=len(next_tool_selection),
+        only_verified=_is_truthy(current_only_verified),
         search_chars=len(str(search_query or "").strip()),
         filtered_rows=len(filtered_rows),
     )
@@ -325,6 +385,7 @@ def _load_the_list_page(request: gr.Request):
         selected_tags = _parse_tag_query_values(_query_param(request, "tag"))
         selected_tools = _parse_tag_query_values(_query_param(request, "tool"))
         search_query = _query_param(request, "q") or _query_param(request, "search")
+        only_verified = True
         tag_filter_update, _tag_filter_choices, tag_filter_selection = _build_tag_filter_update(
             recipes,
             selected_tags,
@@ -335,7 +396,13 @@ def _load_the_list_page(request: gr.Request):
             selected_tools,
             default_to_all=False,
         )
-        filtered_rows = _apply_recipe_filters(recipes, tag_filter_selection, tool_filter_selection, search_query)
+        filtered_rows = _apply_recipe_filters(
+            recipes,
+            tag_filter_selection,
+            tool_filter_selection,
+            search_query,
+            only_verified=only_verified,
+        )
         cards_html = _render_cards(filtered_rows)
 
         _log_timing(
@@ -344,6 +411,7 @@ def _load_the_list_page(request: gr.Request):
             recipes=len(recipes),
             selected_tags=len(tag_filter_selection),
             selected_tools=len(tool_filter_selection),
+            only_verified=only_verified,
             search_chars=len(str(search_query or "").strip()),
             filtered=len(filtered_rows),
         )
@@ -351,6 +419,8 @@ def _load_the_list_page(request: gr.Request):
             "<h2>Recetas</h2>",
             gr.update(visible=True),
             gr.update(value=search_query),
+            _verified_only_button_update(only_verified),
+            only_verified,
             tag_filter_update,
             tag_filter_selection,
             tool_filter_update,
@@ -363,6 +433,8 @@ def _load_the_list_page(request: gr.Request):
             "<h2>Recetas</h2>",
             gr.update(visible=False),
             gr.update(value=""),
+            _verified_only_button_update(True),
+            True,
             gr.update(choices=[(TAG_FILTER_ALL_OPTION, TAG_FILTER_ALL_OPTION)], value=[], interactive=True),
             [],
             gr.update(choices=[(TOOL_FILTER_ALL_OPTION, TOOL_FILTER_ALL_OPTION)], value=[], interactive=True),
@@ -424,9 +496,17 @@ def make_the_list_app() -> gr.Blocks:
                         scale=0,
                         min_width=40,
                     )
+                    verified_only_toggle = gr.Button(
+                        VERIFIED_ONLY_BUTTON_LABEL,
+                        variant="primary",
+                        elem_id="people-verified-only-toggle",
+                        scale=0,
+                        min_width=98,
+                    )
 
             tag_filter_selection_state = gr.State([])
             tool_filter_selection_state = gr.State([])
+            verified_only_state = gr.State(True)
             cards_html = gr.HTML(elem_id="people-cards")
             verify_payload = gr.Textbox(
                 value="",
@@ -448,6 +528,8 @@ def make_the_list_app() -> gr.Blocks:
                 title_md,
                 tag_filter_row,
                 search_box,
+                verified_only_toggle,
+                verified_only_state,
                 tag_filter,
                 tag_filter_selection_state,
                 tool_filter,
@@ -464,20 +546,51 @@ def make_the_list_app() -> gr.Blocks:
 
         tag_filter.input(
             filter_update_handler,
-            inputs=[tag_filter, tag_filter_selection_state, tool_filter, tool_filter_selection_state, search_box],
+            inputs=[
+                tag_filter,
+                tag_filter_selection_state,
+                tool_filter,
+                tool_filter_selection_state,
+                search_box,
+                verified_only_state,
+            ],
             outputs=[tag_filter, tag_filter_selection_state, tool_filter, tool_filter_selection_state, cards_html],
             show_progress=False,
         )
         tool_filter.input(
             filter_update_handler,
-            inputs=[tag_filter, tag_filter_selection_state, tool_filter, tool_filter_selection_state, search_box],
+            inputs=[
+                tag_filter,
+                tag_filter_selection_state,
+                tool_filter,
+                tool_filter_selection_state,
+                search_box,
+                verified_only_state,
+            ],
             outputs=[tag_filter, tag_filter_selection_state, tool_filter, tool_filter_selection_state, cards_html],
             show_progress=False,
         )
         search_box.input(
             filter_update_handler,
-            inputs=[tag_filter, tag_filter_selection_state, tool_filter, tool_filter_selection_state, search_box],
+            inputs=[
+                tag_filter,
+                tag_filter_selection_state,
+                tool_filter,
+                tool_filter_selection_state,
+                search_box,
+                verified_only_state,
+            ],
             outputs=[tag_filter, tag_filter_selection_state, tool_filter, tool_filter_selection_state, cards_html],
+            show_progress=False,
+        )
+        verified_only_toggle.click(
+            timed_page_load(
+                "/recetas",
+                _toggle_verified_only_filter,
+                label="toggle_verified_only_filter",
+            ),
+            inputs=[verified_only_state, tag_filter, tool_filter, search_box],
+            outputs=[verified_only_state, verified_only_toggle, cards_html],
             show_progress=False,
         )
         verify_trigger.click(
@@ -486,7 +599,7 @@ def make_the_list_app() -> gr.Blocks:
                 _toggle_recipe_verified_from_list,
                 label="toggle_recipe_verified_from_list",
             ),
-            inputs=[verify_payload, tag_filter, tool_filter, search_box],
+            inputs=[verify_payload, tag_filter, tool_filter, search_box, verified_only_state],
             outputs=[cards_html],
             show_progress=False,
         )
