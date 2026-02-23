@@ -174,6 +174,14 @@ def _string_or_default(value: object, default: str) -> str:
     return text_value or default
 
 
+def _as_bool(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on", "si", "sí"}
+
+
 def _parse_list(value: object) -> List[str]:
     if isinstance(value, (list, tuple, set)):
         raw_values = [str(item or "").strip() for item in value]
@@ -257,6 +265,7 @@ def _recipe_from_payload(payload: Dict[str, object], slug_hint: str = "") -> Dic
         "card_image_file": str(payload.get("card image file") or payload.get("card_image_file") or "").strip(),
         "tags": _parse_list(payload.get("Tags") or payload.get("tags")),
         "tools": _parse_list(payload.get("Tools") or payload.get("tools")),
+        "verified": _as_bool(payload.get("Verified") if "Verified" in payload else payload.get("verified")),
     }
 
 
@@ -510,6 +519,7 @@ def _render_tag_chips(tags: Sequence[str], *, empty_label: str = "sin-etiquetas"
 
 def _render_recipe_hero(recipe: Dict[str, object]) -> str:
     name = html.escape(str(recipe.get("name") or "Receta"))
+    slug = _slugify(str(recipe.get("slug") or ""))
     card_color = html.escape(str(recipe.get("card_image") or DEFAULT_CARD_COLOR), quote=True)
     total_time = html.escape(str(recipe.get("total_time") or "No especificado"))
     persons = html.escape(str(recipe.get("persons") or "No especificado"))
@@ -529,9 +539,19 @@ def _render_recipe_hero(recipe: Dict[str, object]) -> str:
     tag_catalog_json = html.escape(json.dumps(tag_catalog_values, ensure_ascii=True), quote=True)
     tool_catalog_values = _parse_list(recipe.get("tool_catalog") or recipe.get("tools") or [])
     tool_catalog_json = html.escape(json.dumps(tool_catalog_values, ensure_ascii=True), quote=True)
+    is_verified = bool(recipe.get("verified"))
+    verified_class = "is-verified" if is_verified else "is-unverified"
+    verified_label = "Receta verificada" if is_verified else "Receta sin verificar"
+    safe_slug = html.escape(slug, quote=True)
+    verified_badge = (
+        f'<span class="recipe-card__verified recipe-detail-card__verified {verified_class}" '
+        f'role="button" aria-label="{verified_label}" title="{verified_label}" '
+        f'data-slug="{safe_slug}" data-state="{"true" if is_verified else "false"}" tabindex="0"></span>'
+    )
 
     return f"""
     <section class="person-detail-card recipe-detail-card">
+      {verified_badge}
       <div class="{media_classes}" style="--recipe-card-color: {card_color};">
         {swatch_markup}
         <img class="{image_class}" src="{image_src}" alt="{name}" loading="lazy"/>

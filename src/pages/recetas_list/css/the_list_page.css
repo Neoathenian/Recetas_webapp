@@ -235,6 +235,7 @@ button#the-list-create-profile-trigger:focus-visible {
   justify-content: center;
   overflow: hidden;
   padding: 0;
+  position: relative;
 }
 
 .person-card__image-wrap--has-image {
@@ -271,6 +272,41 @@ button#the-list-create-profile-trigger:focus-visible {
   line-height: 1.28;
   font-weight: 700;
   color: var(--recetas-text);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+}
+
+.recipe-card__verified {
+  display: block;
+  position: absolute;
+  top: 0.62rem;
+  right: 0.62rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+  z-index: 2;
+  font-size: 0;
+  color: transparent;
+  line-height: 0;
+  pointer-events: auto;
+  cursor: pointer;
+  user-select: none;
+}
+
+.recipe-card__verified:focus-visible {
+  outline: 2px solid rgba(59, 130, 103, 0.55);
+  outline-offset: 2px;
+}
+
+.recipe-card__verified.is-verified {
+  background-image: url("/images/filled-checkmark.png");
+}
+
+.recipe-card__verified.is-unverified {
+  background-image: url("/images/blank-checkmark.png");
 }
 
 .recipe-card__chip-group {
@@ -315,6 +351,63 @@ button#the-list-create-profile-trigger:focus-visible {
   text-align: center;
   color: #5f6b75;
   background: #f8f9fa;
+}
+
+#the-list-toast-root {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.6rem;
+  pointer-events: none;
+}
+
+.the-list-toast {
+  width: min(500px, calc(100vw - 2rem));
+  padding: 0.8rem 0.95rem;
+  border-radius: 0.75rem;
+  border: 1px solid transparent;
+  font-weight: 600;
+  line-height: 1.35;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+  opacity: 0;
+  transform: translate3d(18px, 0, 0);
+  animation: the-list-toast-enter 180ms ease-out forwards;
+}
+
+.the-list-toast--success {
+  background: #ecfdf3;
+  border-color: #86efac;
+  color: #065f46;
+}
+
+.the-list-toast.is-hiding {
+  animation: the-list-toast-exit 200ms ease-in forwards;
+}
+
+@keyframes the-list-toast-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(18px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes the-list-toast-exit {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(18px, 0, 0);
+  }
 }
 
 @media (max-width: 980px) {

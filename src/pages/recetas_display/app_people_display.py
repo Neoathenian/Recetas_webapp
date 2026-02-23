@@ -82,6 +82,10 @@ def _is_truthy(value: object) -> bool:
     return str(value or "").strip().lower() in TRUE_VALUES
 
 
+def _bool_state(value: object) -> str:
+    return "true" if _is_truthy(value) else "false"
+
+
 def _is_create_request(request: gr.Request | None) -> bool:
     return _is_truthy(_query_param(request, "create") or _query_param(request, "new"))
 
@@ -294,6 +298,7 @@ def _build_edit_form(recipe: Dict[str, object]) -> Dict[str, str]:
         "ingredients": _ingredients_to_text(recipe),
         "steps": _steps_to_text(recipe),
         "image_route": str(recipe.get("card_image_file") or "").strip(),
+        "verified": bool(recipe.get("verified")),
     }
 
 
@@ -307,6 +312,7 @@ def _recipe_from_form_inputs(
     ingredients_text: str,
     steps_text: str,
     image_route: str = "",
+    verified: bool = False,
 ) -> Dict[str, object]:
     ingredients_map = _parse_ingredients_input(ingredients_text)
     return {
@@ -321,6 +327,7 @@ def _recipe_from_form_inputs(
         "card_image_file": str(image_route or "").strip(),
         "tags": _parse_inline_values(tags_text),
         "tools": _parse_inline_values(tools_text),
+        "verified": bool(verified),
     }
 
 
@@ -328,6 +335,7 @@ def _empty_page_state(title_html: str, detail_html: str, page_message: str = "")
     return (
         title_html,
         gr.update(value=EDIT_TOGGLE_BUTTON_LABEL, visible=False),
+        gr.update(value=_bool_state(False)),
         gr.update(value=page_message, visible=bool(page_message)),
         gr.update(value=detail_html, visible=True),
         gr.update(value="", visible=False),
@@ -372,6 +380,7 @@ def _recipe_page_state(
     return (
         f"<h2>{html.escape(str(recipe.get('name') or 'Receta'))}</h2>",
         gr.update(value=EDIT_TOGGLE_BUTTON_LABEL, visible=show_edit_button),
+        gr.update(value=_bool_state(form["verified"])),
         gr.update(value=page_message, visible=bool(page_message)),
         gr.update(value=_render_recipe_hero(recipe_for_render), visible=True),
         gr.update(value=_render_recipe_markdown(recipe), visible=not editing),
@@ -411,6 +420,7 @@ def _new_recipe_page_state(
     ingredients_text: str = "",
     steps_text: str = "",
     image_route: str = "",
+    verified_flag: bool = False,
 ) -> tuple[object, ...]:
     recipe = _recipe_from_form_inputs(
         name=seed_name,
@@ -421,6 +431,7 @@ def _new_recipe_page_state(
         ingredients_text=ingredients_text,
         steps_text=steps_text,
         image_route=image_route,
+        verified=verified_flag,
     )
     return _recipe_page_state(
         recipe,
@@ -505,6 +516,7 @@ def _save_recipe_edits(
     card_proposal_tools: str,
     card_proposal_total_time: str,
     card_proposal_persons: str,
+    recipe_verified_state: str,
     card_proposal_image: object,
     card_proposal_image_data: str,
     edit_ingredients: str,
@@ -520,6 +532,7 @@ def _save_recipe_edits(
             page_message="❌ Selecciona primero una receta.",
         )
     normalized_slug = _slugify(raw_slug if not is_create_mode else card_proposal_name)
+    verified_value = _is_truthy(recipe_verified_state)
 
     if is_create_mode and not str(card_proposal_name or "").strip():
         return _new_recipe_page_state(
@@ -532,6 +545,7 @@ def _save_recipe_edits(
             ingredients_text=edit_ingredients,
             steps_text=edit_steps,
             image_route=current_image_route,
+            verified_flag=verified_value,
         )
 
     existing_payload = _read_recipe_payload(normalized_slug)
@@ -555,6 +569,7 @@ def _save_recipe_edits(
             ingredients_text=edit_ingredients,
             steps_text=edit_steps,
             image_route=current_image_route,
+            verified_flag=verified_value,
         )
     if existing_payload is None:
         existing_payload = {}
@@ -584,6 +599,7 @@ def _save_recipe_edits(
                 ingredients_text=edit_ingredients,
                 steps_text=edit_steps,
                 image_route=current_image_route,
+                verified_flag=verified_value,
             )
         return _state_from_slug(normalized_slug, editing=True, card_message=f"❌ {cropped_error}")
 
@@ -600,6 +616,7 @@ def _save_recipe_edits(
                 ingredients_text=edit_ingredients,
                 steps_text=edit_steps,
                 image_route=current_image_route,
+                verified_flag=verified_value,
             )
         return _state_from_slug(normalized_slug, editing=True, card_message=f"❌ {upload_error}")
 
@@ -621,6 +638,7 @@ def _save_recipe_edits(
                     ingredients_text=edit_ingredients,
                     steps_text=edit_steps,
                     image_route=current_image_route,
+                    verified_flag=verified_value,
                 )
             return _state_from_slug(normalized_slug, editing=True, card_message="❌ No se pudo guardar la imagen.")
 
@@ -630,6 +648,7 @@ def _save_recipe_edits(
     next_payload["Steps"] = steps
     next_payload["Total time"] = clean_total_time
     next_payload["Nºpersonas"] = clean_persons
+    next_payload["Verified"] = verified_value
     next_payload["card image"] = clean_card_color
     next_payload["Tags"] = clean_tags
     next_payload["Tools"] = clean_tools
@@ -650,6 +669,7 @@ def _save_recipe_edits(
                 ingredients_text=edit_ingredients,
                 steps_text=edit_steps,
                 image_route=current_image_route,
+                verified_flag=verified_value,
             )
         return _state_from_slug(
             normalized_slug,
@@ -668,6 +688,75 @@ def _save_recipe_edits(
         normalized_slug,
         editing=False,
         page_message="✅ Receta actualizada.",
+    )
+
+
+def _toggle_recipe_verified_from_detail(
+    payload_json: str,
+    current_slug: str,
+    recipe_verified_state: str,
+):
+    try:
+        payload = json.loads(payload_json or "{}")
+    except json.JSONDecodeError:
+        payload = {}
+
+    has_next_state = "nextState" in payload
+    next_value = _is_truthy(payload.get("nextState")) if has_next_state else _is_truthy(recipe_verified_state)
+
+    current_slug_raw = str(current_slug or "").strip()
+    payload_slug = str(payload.get("slug") or "").strip()
+    resolved_slug = payload_slug or current_slug_raw
+    if resolved_slug == NEW_RECIPE_SENTINEL:
+        return (
+            gr.update(),
+            gr.update(value="ℹ️ Esta verificación se guardará cuando crees la receta.", visible=True),
+            gr.update(value=_bool_state(next_value)),
+        )
+    if not resolved_slug:
+        return (
+            gr.update(),
+            gr.update(value="❌ Selecciona una receta para marcarla.", visible=True),
+            gr.update(value=_bool_state(False)),
+        )
+
+    normalized_slug = _slugify(resolved_slug)
+    recipe_payload = _read_recipe_payload(normalized_slug)
+    if recipe_payload is None:
+        return (
+            gr.update(),
+            gr.update(value="❌ No se encontró la receta.", visible=True),
+            gr.update(value=_bool_state(recipe_verified_state)),
+        )
+
+    current_value = _is_truthy(
+        recipe_payload.get("Verified") if "Verified" in recipe_payload else recipe_payload.get("verified")
+    )
+    if current_value != next_value:
+        recipe_payload["Verified"] = next_value
+        if not _write_recipe_payload(normalized_slug, recipe_payload):
+            return (
+                gr.update(),
+                gr.update(value="❌ No se pudo actualizar la verificación.", visible=True),
+                gr.update(value=_bool_state(current_value)),
+            )
+
+    recipe = _fetch_recipe_by_slug(normalized_slug)
+    if recipe is None:
+        return (
+            gr.update(),
+            gr.update(value="✅ Verificación actualizada.", visible=True),
+            gr.update(value=_bool_state(next_value)),
+        )
+
+    recipe_for_render = dict(recipe)
+    recipe_for_render["tag_catalog"] = _collect_choices("tags")
+    recipe_for_render["tool_catalog"] = _collect_choices("tools")
+    state_text = "verificada" if next_value else "sin verificar"
+    return (
+        gr.update(value=_render_recipe_hero(recipe_for_render), visible=True),
+        gr.update(value=f"✅ Receta marcada como {state_text}.", visible=True),
+        gr.update(value=_bool_state(next_value)),
     )
 
 
@@ -791,10 +880,28 @@ def make_people_display_app() -> gr.Blocks:
                 interactive=False,
                 elem_id="the-list-current-persons",
             )
+            recipe_verified_state = gr.Textbox(
+                value=_bool_state(False),
+                visible=False,
+                interactive=False,
+                elem_id="recipe-verified-state",
+            )
+            detail_verify_payload = gr.Textbox(
+                value="",
+                visible=False,
+                interactive=False,
+                elem_id="recipe-detail-verify-payload",
+            )
+            detail_verify_trigger = gr.Button(
+                "_toggle_recipe_verified_detail",
+                visible=False,
+                elem_id="recipe-detail-verify-trigger",
+            )
 
         page_state_outputs = [
             title_md,
             edit_btn,
+            recipe_verified_state,
             page_status,
             detail_html,
             detail_markdown,
@@ -851,6 +958,7 @@ def make_people_display_app() -> gr.Blocks:
                 card_proposal_tools,
                 card_proposal_total_time,
                 card_proposal_persons,
+                recipe_verified_state,
                 card_proposal_image,
                 card_proposal_image_data,
                 edit_ingredients_input,
@@ -858,6 +966,16 @@ def make_people_display_app() -> gr.Blocks:
                 image_route_state,
             ],
             outputs=page_state_outputs,
+            show_progress=False,
+        )
+        detail_verify_trigger.click(
+            timed_page_load(
+                "/receta",
+                _toggle_recipe_verified_from_detail,
+                label="toggle_recipe_verified_from_detail",
+            ),
+            inputs=[detail_verify_payload, current_slug, recipe_verified_state],
+            outputs=[detail_html, page_status, recipe_verified_state],
             show_progress=False,
         )
 

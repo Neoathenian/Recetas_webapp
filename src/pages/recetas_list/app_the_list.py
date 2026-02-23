@@ -27,7 +27,10 @@ from src.pages.recetas_list.core_the_list import (
     _normalize_tag,
     _parse_tag_query_values,
     _query_param,
+    _read_recipe_payload,
     _render_tag_chips,
+    _slugify,
+    _write_recipe_payload,
 )
 
 logger = logging.getLogger(__name__)
@@ -75,6 +78,15 @@ def _render_cards(recipes: Sequence[Dict[str, object]]) -> str:
         name = html.escape(str(row.get("name") or "Receta"))
         slug = str(row.get("slug") or "")
         href = f"/receta/?slug={quote(slug, safe='-')}"
+        is_verified = bool(row.get("verified"))
+        verified_class = "is-verified" if is_verified else "is-unverified"
+        verified_label = "Receta verificada" if is_verified else "Receta sin verificar"
+        safe_slug = html.escape(slug, quote=True)
+        verified_badge = (
+            f'<span class="recipe-card__verified {verified_class}" '
+            f'role="button" aria-label="{verified_label}" title="{verified_label}" '
+            f'data-slug="{safe_slug}" data-state="{"true" if is_verified else "false"}" tabindex="0"></span>'
+        )
 
         card_color = html.escape(str(row.get("card_image") or "rgb(118, 161, 146)"), quote=True)
         card_image_file = str(row.get("card_image_file") or "").strip()
@@ -95,6 +107,7 @@ def _render_cards(recipes: Sequence[Dict[str, object]]) -> str:
             <a class="person-card" href="{href}" data-tags-json="{tags_json_attr}">
               <div class="{image_wrap_class}" style="--recipe-card-color: {card_color};">
                 {media_markup}
+                {verified_badge}
               </div>
               <div class="person-card__content">
                 <h3 class="person-card__title">{name}</h3>
@@ -199,6 +212,60 @@ def _apply_recipe_filters(
     tag_filtered_rows = _filter_people_for_tag_selection(recipes, tag_selection)
     tool_filtered_rows = _filter_people_for_tool_selection(tag_filtered_rows, tool_selection)
     return _filter_people_for_search_query(tool_filtered_rows, search_query)
+
+
+def _is_truthy(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on", "si", "sí"}
+
+
+def _render_cards_for_current_filters(
+    current_tag_selection: Sequence[object] | None,
+    current_tool_selection: Sequence[object] | None,
+    search_query: object,
+):
+    recipes = _fetch_all_people()
+    filtered_rows = _apply_recipe_filters(recipes, current_tag_selection, current_tool_selection, search_query)
+    return gr.update(value=_render_cards(filtered_rows), visible=True)
+
+
+def _toggle_recipe_verified_from_list(
+    payload_json: str,
+    current_tag_selection: Sequence[object] | None,
+    current_tool_selection: Sequence[object] | None,
+    search_query: str,
+):
+    total_start = time.perf_counter()
+    try:
+        payload = json.loads(payload_json or "{}")
+    except json.JSONDecodeError:
+        payload = {}
+
+    raw_slug = str(payload.get("slug") or "").strip()
+    slug = _slugify(raw_slug) if raw_slug else ""
+    next_state = _is_truthy(payload.get("nextState"))
+    has_state = "nextState" in payload
+    if slug and has_state:
+        recipe_payload = _read_recipe_payload(slug)
+        if recipe_payload is not None:
+            recipe_payload["Verified"] = bool(next_state)
+            _write_recipe_payload(slug, recipe_payload)
+
+    cards_update = _render_cards_for_current_filters(
+        current_tag_selection=current_tag_selection,
+        current_tool_selection=current_tool_selection,
+        search_query=search_query,
+    )
+    _log_timing(
+        "toggle_recipe_verified_from_list.total",
+        total_start,
+        slug=slug or "<empty>",
+        has_state=has_state,
+    )
+    return cards_update
 
 
 def _update_people_cards_by_filters(
@@ -361,6 +428,18 @@ def make_the_list_app() -> gr.Blocks:
             tag_filter_selection_state = gr.State([])
             tool_filter_selection_state = gr.State([])
             cards_html = gr.HTML(elem_id="people-cards")
+            verify_payload = gr.Textbox(
+                value="",
+                show_label=False,
+                interactive=False,
+                visible=False,
+                elem_id="recipe-verify-payload",
+            )
+            verify_trigger = gr.Button(
+                "_toggle_verified",
+                visible=False,
+                elem_id="recipe-verify-trigger",
+            )
 
         app.load(timed_page_load("/recetas", _header_the_list), outputs=[hdr])
         app.load(
@@ -399,6 +478,16 @@ def make_the_list_app() -> gr.Blocks:
             filter_update_handler,
             inputs=[tag_filter, tag_filter_selection_state, tool_filter, tool_filter_selection_state, search_box],
             outputs=[tag_filter, tag_filter_selection_state, tool_filter, tool_filter_selection_state, cards_html],
+            show_progress=False,
+        )
+        verify_trigger.click(
+            timed_page_load(
+                "/recetas",
+                _toggle_recipe_verified_from_list,
+                label="toggle_recipe_verified_from_list",
+            ),
+            inputs=[verify_payload, tag_filter, tool_filter, search_box],
+            outputs=[cards_html],
             show_progress=False,
         )
 

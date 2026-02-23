@@ -7,6 +7,12 @@
   ];
   const CREATE_TRIGGER_ID = "the-list-create-profile-trigger";
   const CREATE_PAGE_PATH = "/receta/?create=1";
+  const VERIFY_PAYLOAD_ID = "recipe-verify-payload";
+  const VERIFY_TRIGGER_ID = "recipe-verify-trigger";
+  const CARDS_HOST_ID = "people-cards";
+  const TOAST_ROOT_ID = "the-list-toast-root";
+  const TOAST_HIDE_DELAY_MS = 4200;
+  const TOAST_REMOVE_DELAY_MS = 4700;
   const ALL_VALUE = "all";
 
   const ensureRoot = () => {
@@ -43,6 +49,36 @@
     scope.querySelector(
       "textarea, input[type='hidden'], .choices input[type='hidden'], .multiselect input[type='hidden'], .selectize-control input[type='hidden']",
     );
+  const q = (root, selector) => (root ? root.querySelector(selector) : null);
+  const setTextboxValue = (el, value) => {
+    if (!el) return;
+    el.value = String(value ?? "");
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+
+  const ensureToastRoot = () => {
+    let root = document.getElementById(TOAST_ROOT_ID);
+    if (root) return root;
+    root = document.createElement("div");
+    root.id = TOAST_ROOT_ID;
+    document.body.appendChild(root);
+    return root;
+  };
+
+  const showSuccessToast = (message) => {
+    const root = ensureToastRoot();
+    const toast = document.createElement("div");
+    toast.className = "the-list-toast the-list-toast--success";
+    toast.textContent = String(message || "").replace(/^\s*✅\s*/, "").trim();
+    root.appendChild(toast);
+    window.setTimeout(() => {
+      toast.classList.add("is-hiding");
+    }, TOAST_HIDE_DELAY_MS);
+    window.setTimeout(() => {
+      toast.remove();
+    }, TOAST_REMOVE_DELAY_MS);
+  };
 
   const parseValues = (scope) => {
     const hidden = hiddenInput(scope);
@@ -593,9 +629,54 @@
     nestedButton.dataset.peopleCreateTriggerBound = "1";
   };
 
+  const handleVerifiedBadgeActivation = (badge, event) => {
+    const root = ensureRoot();
+    if (!root || !(badge instanceof HTMLElement)) return;
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    const slug = String(badge.getAttribute("data-slug") || "").trim().toLowerCase();
+    if (!slug) return;
+    const currentState = String(badge.getAttribute("data-state") || "").trim().toLowerCase() === "true";
+    const payload = { slug, nextState: !currentState };
+    const textbox = q(root, `#${VERIFY_PAYLOAD_ID} textarea, #${VERIFY_PAYLOAD_ID} input`);
+    const trigger = q(root, `#${VERIFY_TRIGGER_ID}`);
+    if (!textbox || !trigger) return;
+    setTextboxValue(textbox, JSON.stringify(payload));
+    trigger.click();
+    const nextLabel = !currentState ? "verificada" : "sin verificar";
+    showSuccessToast(`Receta marcada como ${nextLabel}.`);
+  };
+
+  const bindVerifiedToggle = () => {
+    const root = ensureRoot();
+    if (!root) return;
+    const host = q(root, `#${CARDS_HOST_ID}`) || document.getElementById(CARDS_HOST_ID);
+    if (!(host instanceof HTMLElement) || host.dataset.recipeVerifiedBound === "1") return;
+
+    host.addEventListener("click", (event) => {
+      const target = event.target;
+      const badge = target instanceof Element ? target.closest(".recipe-card__verified") : null;
+      if (!(badge instanceof HTMLElement) || !host.contains(badge)) return;
+      handleVerifiedBadgeActivation(badge, event);
+    });
+    host.addEventListener("keydown", (event) => {
+      if (!(event instanceof KeyboardEvent)) return;
+      if (event.key !== "Enter" && event.key !== " ") return;
+      const target = event.target;
+      const badge = target instanceof Element ? target.closest(".recipe-card__verified") : null;
+      if (!(badge instanceof HTMLElement) || !host.contains(badge)) return;
+      handleVerifiedBadgeActivation(badge, event);
+    });
+
+    host.dataset.recipeVerifiedBound = "1";
+  };
+
   const bootstrap = () => {
     DROPDOWN_CONFIGS.forEach((config) => bindDropdown(config));
     bindCreateTrigger();
+    bindVerifiedToggle();
   };
 
   if (document.readyState === "loading") {

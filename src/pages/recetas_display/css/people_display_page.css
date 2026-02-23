@@ -122,6 +122,45 @@ button#the-list-card-edit-btn:focus-visible {
   overflow: visible;
 }
 
+.recipe-detail-card {
+  position: relative;
+}
+
+.recipe-card__verified {
+  display: block;
+  width: 1.5rem;
+  height: 1.5rem;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+  font-size: 0;
+  color: transparent;
+  line-height: 0;
+  pointer-events: auto;
+  cursor: pointer;
+  user-select: none;
+}
+
+.recipe-card__verified:focus-visible {
+  outline: 2px solid rgba(59, 130, 103, 0.55);
+  outline-offset: 2px;
+}
+
+.recipe-card__verified.is-verified {
+  background-image: url("/images/filled-checkmark.png");
+}
+
+.recipe-card__verified.is-unverified {
+  background-image: url("/images/blank-checkmark.png");
+}
+
+.recipe-detail-card__verified {
+  position: absolute;
+  top: 0.72rem;
+  right: 0.72rem;
+  z-index: 5;
+}
+
 .person-detail-card__media {
   position: relative;
   border-radius: 12px;

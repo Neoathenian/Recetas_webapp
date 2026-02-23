@@ -15,7 +15,8 @@
   const PROPOSAL_BIB_BUTTON_ID = "the-list-proposal-bib-btn";
   const PROPOSAL_ACTIONS_ID = "the-list-proposal-actions";
   const SOURCE_CITATION_OPTIONS_ID = "the-list-source-citation-options";
-  const PROPOSAL_STATUS_IDS = ["the-list-proposal-status", "the-list-card-proposal-status"];
+  const PROPOSAL_STATUS_IDS = ["the-list-proposal-status", "the-list-card-proposal-status", "recipe-page-status"];
+  const VERIFY_STATUS_PATTERN = /receta marcada como (verificada|sin verificar)/i;
   const TOAST_ROOT_ID = "the-list-toast-root";
   const TOAST_HIDE_DELAY_MS = 4200;
   const TOAST_REMOVE_DELAY_MS = 4700;
@@ -46,6 +47,10 @@
   const DETAIL_PERSONS_VALUE_SELECTOR = ".recipe-meta-item__value--persons";
   const DETAIL_MEDIA_SELECTOR = ".person-detail-card__media";
   const DETAIL_IMAGE_SELECTOR = ".person-detail-card__media img";
+  const DETAIL_VERIFY_BADGE_SELECTOR = ".recipe-detail-card__verified";
+  const DETAIL_VERIFY_PAYLOAD_ID = "recipe-detail-verify-payload";
+  const DETAIL_VERIFY_TRIGGER_ID = "recipe-detail-verify-trigger";
+  const DETAIL_VERIFY_STATE_ID = "recipe-verified-state";
   const CARD_IMAGE_CROP_MODAL_ID = "the-list-card-image-crop-modal";
   const CARD_IMAGE_CROP_VIEW_WIDTH = 360;
   const CARD_IMAGE_CROP_VIEW_HEIGHT = 270;
@@ -454,6 +459,11 @@
     if ((input.value || "") === next) return;
     input.value = next;
     dispatchComponentEvents(input);
+  };
+
+  const isTrueish = (value) => {
+    const normalized = String(value || "").trim().toLowerCase();
+    return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on" || normalized === "si" || normalized === "sí";
   };
 
   const normalizeMarkdownLineEndings = (value) =>
@@ -2601,6 +2611,47 @@
     });
   };
 
+  const handleDetailVerifiedActivation = (badge, event) => {
+    if (!(badge instanceof HTMLElement)) return;
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    const slug = String(badge.getAttribute("data-slug") || "").trim().toLowerCase();
+    const currentState = isTrueish(badge.getAttribute("data-state"));
+    const nextState = !currentState;
+    const payload = JSON.stringify({ slug, nextState });
+    setComponentValue(DETAIL_VERIFY_PAYLOAD_ID, payload);
+    setComponentValue(DETAIL_VERIFY_STATE_ID, nextState ? "true" : "false");
+
+    const triggerHost = document.getElementById(DETAIL_VERIFY_TRIGGER_ID);
+    const trigger = resolveButtonClickHost(triggerHost);
+    if (!(trigger instanceof HTMLElement)) return;
+    trigger.click();
+  };
+
+  const bindDetailVerifiedToggle = () => {
+    const heroHost = document.getElementById("person-detail-hero");
+    if (!(heroHost instanceof HTMLElement) || heroHost.dataset.detailVerifiedBound === "1") return;
+    heroHost.dataset.detailVerifiedBound = "1";
+
+    heroHost.addEventListener("click", (event) => {
+      const target = event.target;
+      const badge = target instanceof Element ? target.closest(DETAIL_VERIFY_BADGE_SELECTOR) : null;
+      if (!(badge instanceof HTMLElement) || !heroHost.contains(badge)) return;
+      handleDetailVerifiedActivation(badge, event);
+    });
+
+    heroHost.addEventListener("keydown", (event) => {
+      if (!(event instanceof KeyboardEvent)) return;
+      if (event.key !== "Enter" && event.key !== " ") return;
+      const target = event.target;
+      const badge = target instanceof Element ? target.closest(DETAIL_VERIFY_BADGE_SELECTOR) : null;
+      if (!(badge instanceof HTMLElement) || !heroHost.contains(badge)) return;
+      handleDetailVerifiedActivation(badge, event);
+    });
+  };
+
   const setNodeText = (node, value) => {
     if (!(node instanceof HTMLElement)) return;
     node.textContent = String(value || "");
@@ -4705,9 +4756,12 @@
         if (!message || message === lastMessage) return;
         lastMessage = message;
         if (!message.startsWith("✅")) return;
+        if (statusId === "recipe-page-status" && !VERIFY_STATUS_PATTERN.test(message)) return;
         showSuccessToast(message);
         clearStatusMessage(statusNode);
-        scrollToTop();
+        if (statusId !== "recipe-page-status") {
+          scrollToTop();
+        }
       };
       const statusObserver = new MutationObserver(syncStatus);
       statusObserver.observe(statusNode, {
@@ -4727,6 +4781,7 @@
     bindCitationInsertButton();
     bindBibliographyInsertButton();
     bindProposalStatusToasts();
+    bindDetailVerifiedToggle();
     refreshInlineCardEditor();
     ensureRecipeIngredientsEditor();
     ensureRecipeStepsEditor();
