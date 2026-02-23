@@ -58,7 +58,12 @@ import os
 import mimetypes
 import gradio as gr
 
-os.environ.setdefault("RECETAS_BUCKET_NAME", "recetas-bucket")
+_configured_bucket = (os.getenv("BUCKET_NAME") or os.getenv("API_STORAGE_BUCKET") or "").strip()
+if _configured_bucket:
+    # Keep BUCKET_NAME as the source of truth for runtime config.
+    os.environ["RECETAS_BUCKET_NAME"] = _configured_bucket
+else:
+    os.environ.setdefault("RECETAS_BUCKET_NAME", "recetas-bucket")
 
 from src.login_logic import register_oauth_provider, add_login_snippet_route
 from src.pages.ui_login import make_login_page
