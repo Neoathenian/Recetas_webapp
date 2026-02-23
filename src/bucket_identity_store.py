@@ -93,16 +93,6 @@ def _iter_json_blobs(prefix: str) -> Iterable[str]:
     return names
 
 
-def _has_any_privilege_docs() -> bool:
-    client = storage_client()
-    bucket = client.bucket(get_bucket().name)
-    for blob in client.list_blobs(bucket, prefix=f"{PRIVILEGES_PREFIX}/", max_results=1):
-        name = str(getattr(blob, "name", "") or "").strip()
-        if name.endswith(".json"):
-            return True
-    return False
-
-
 def empty_privileges() -> Dict[str, bool]:
     return {name: False for name in PRIVILEGE_FIELDS}
 
@@ -113,21 +103,7 @@ def get_user_privileges(email: str | None) -> Dict[str, bool]:
     if not normalized_email:
         return privileges
 
-    raw = _download_json_blob(_privileges_blob_name(normalized_email))
-    if raw is None and not _has_any_privilege_docs():
-        # Bootstrap: first authenticated user gets full access in bucket-only mode.
-        bootstrap_payload: Dict[str, object] = {
-            "email": normalized_email,
-            "created_at": _utc_now_iso(),
-            "updated_at": _utc_now_iso(),
-        }
-        for key in PRIVILEGE_FIELDS:
-            bootstrap_payload[key] = True
-            privileges[key] = True
-        _upload_json_blob(_privileges_blob_name(normalized_email), bootstrap_payload)
-        return privileges
-
-    raw = raw or {}
+    raw = _download_json_blob(_privileges_blob_name(normalized_email)) or {}
     for key in PRIVILEGE_FIELDS:
         privileges[key] = bool(raw.get(key))
     return privileges

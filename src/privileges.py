@@ -20,9 +20,7 @@ NAVIGATION_ORDER: tuple[str, ...] = (
     "admin",
 )
 
-PUBLIC_PAGE_KEYS: tuple[str, ...] = (
-    "the-list",
-)
+PUBLIC_PAGE_KEYS: tuple[str, ...] = ()
 
 PAGE_REGISTRY: dict[str, PageLink] = {
     "the-list": PageLink("the-list", "Recetas", "/recetas/", "hdr-link hdr-link--the-list"),
@@ -43,11 +41,15 @@ PAGE_REGISTRY: dict[str, PageLink] = {
 
 PRIVILEGE_PAGE_MAP: dict[str, set[str]] = {
     "base_user": {"the-list"},
-    "reviewer": {"the-list", "the-list-review"},
+    "reviewer": {"the-list"},
     "editor": {"the-list"},
-    "admin": {"the-list", "the-list-review", "privileges"},
-    "creator": {"the-list", "the-list-review", "privileges", "admin"},
+    "admin": {"the-list", "privileges"},
+    "creator": {"the-list", "privileges", "admin"},
 }
+
+DISABLED_PAGE_KEYS: tuple[str, ...] = (
+    "the-list-review",
+)
 
 DEBUG_PRIVILEGES_ENV = "THELIST_DEBUG_PRIVILEGES"
 _DEBUG_TRUE_VALUES = {"1", "true", "yes", "on"}
@@ -90,17 +92,21 @@ def _enabled_privilege_keys(privileges: PrivilegeMapping | None) -> tuple[str, .
 
 def resolve_nav_links(privileges: PrivilegeMapping | None) -> List[PageLink]:
     if _is_debug_mode():
-        return [PAGE_REGISTRY[key] for key in NAVIGATION_ORDER]
+        return [PAGE_REGISTRY[key] for key in NAVIGATION_ORDER if key not in DISABLED_PAGE_KEYS]
 
     allowed: set[str] = set(PUBLIC_PAGE_KEYS)
     normalized = _enabled_privilege_keys(privileges)
     for privilege in normalized:
         allowed.update(PRIVILEGE_PAGE_MAP.get(privilege, set()))
 
-    links = [PAGE_REGISTRY[key] for key in NAVIGATION_ORDER if key in allowed]
+    links = [PAGE_REGISTRY[key] for key in NAVIGATION_ORDER if key in allowed and key not in DISABLED_PAGE_KEYS]
     if links:
         return links
-    return [PAGE_REGISTRY[key] for key in NAVIGATION_ORDER if key in PUBLIC_PAGE_KEYS]
+    return [
+        PAGE_REGISTRY[key]
+        for key in NAVIGATION_ORDER
+        if key in PUBLIC_PAGE_KEYS and key not in DISABLED_PAGE_KEYS
+    ]
 
 
 def _normalize_route(route: str) -> str:
@@ -123,6 +129,8 @@ def accessible_page_keys(privileges: PrivilegeMapping | None) -> Set[str]:
 
 
 def user_can_access_page(privileges: PrivilegeMapping | None, page_key: str) -> bool:
+    if page_key in DISABLED_PAGE_KEYS:
+        return False
     if page_key not in PAGE_REGISTRY:
         return True
     if _is_debug_mode():
@@ -132,6 +140,8 @@ def user_can_access_page(privileges: PrivilegeMapping | None, page_key: str) -> 
 
 def default_page_path(privileges: PrivilegeMapping | None) -> str:
     links = resolve_nav_links(privileges)
+    if not links:
+        return "/"
     return links[0].path
 
 

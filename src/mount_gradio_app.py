@@ -171,7 +171,8 @@ def add_middleware_redirect(app, app_route: str):
             _ensure_user_loaded()
             if user:
                 redirect_target = default_page_path(privileges)
-                return RedirectResponse(url=redirect_target)
+                if redirect_target != "/":
+                    return RedirectResponse(url=redirect_target)
 
         # Always allow public root and auth/public entry points
         if (

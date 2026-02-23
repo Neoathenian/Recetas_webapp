@@ -13,10 +13,13 @@ def make_login_page() -> gr.Blocks:
     ) as login_page:
         hdr = gr.HTML()
         gr.Markdown(
-            "## Bienvenido\nPuedes explorar las páginas públicas como invitado. "
-            "Inicia sesión para tener privilegios de colaboración."
+            "## Bienvenido\nSi no has iniciado sesión, esta es la única página disponible. "
+            "Si ya iniciaste sesión pero no ves menús, tu cuenta aún no tiene privilegios."
         )
-        gr.Markdown("- Información pública\n- Contenido editorial\n- Lo que quieras mostrar aquí")
+        gr.Markdown(
+            "Si inicias sesión por primera vez, tu cuenta comienza sin privilegios. "
+            "Un usuario con permisos de gestión debe habilitar tu acceso."
+        )
 
         login_page.load(timed_page_load("/", _header_root), outputs=[hdr])
 
