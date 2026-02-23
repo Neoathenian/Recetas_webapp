@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import binascii
 import html
+import json
 import logging
 import os
 import re
@@ -312,7 +313,7 @@ def _recipe_from_form_inputs(
     ingredients_text: str,
     steps_text: str,
     image_route: str = "",
-    verified: bool = False,
+    verified: bool = True,
 ) -> Dict[str, object]:
     ingredients_map = _parse_ingredients_input(ingredients_text)
     return {
@@ -420,7 +421,7 @@ def _new_recipe_page_state(
     ingredients_text: str = "",
     steps_text: str = "",
     image_route: str = "",
-    verified_flag: bool = False,
+    verified_flag: bool = True,
 ) -> tuple[object, ...]:
     recipe = _recipe_from_form_inputs(
         name=seed_name,
@@ -881,7 +882,7 @@ def make_people_display_app() -> gr.Blocks:
                 elem_id="the-list-current-persons",
             )
             recipe_verified_state = gr.Textbox(
-                value=_bool_state(False),
+                value=_bool_state(True),
                 visible=False,
                 interactive=False,
                 elem_id="recipe-verified-state",
