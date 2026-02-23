@@ -28,6 +28,23 @@
   margin: 0;
   flex: 1 1 auto;
   min-width: 0;
+  --block-border-width: 0;
+  --block-padding: 0;
+  --block-background-fill: transparent;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+#people-title .wrap,
+#people-title > .wrap {
+  padding: 0 !important;
+  overflow: visible !important;
+}
+
+#people-title .prose {
+  margin: 0 !important;
 }
 
 #people-title h2 {
@@ -37,6 +54,7 @@
   letter-spacing: -0.02em;
   line-height: 1;
   font-weight: 760;
+  transform: translateY(0.12rem);
 }
 
 #people-filter-row {
@@ -54,10 +72,10 @@
 #people-search {
   margin-left: auto;
   align-self: flex-end;
-  flex: 0 0 360px !important;
-  width: 360px !important;
-  max-width: 380px !important;
-  min-width: 280px !important;
+  flex: 0 0 300px !important;
+  width: 300px !important;
+  max-width: 310px !important;
+  min-width: 240px !important;
   --block-border-width: 0;
   --block-padding: 0;
   --block-background-fill: transparent;
@@ -103,7 +121,18 @@
   box-shadow: 0 0 0 2px rgba(75, 122, 102, 0.15);
 }
 
-#people-tag-filter,
+#people-tag-filter {
+  width: 200px;
+  max-width: 200px;
+  min-width: 160px;
+  --block-border-width: 0;
+  --block-padding: 0;
+  --block-background-fill: transparent;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
 #people-tool-filter {
   width: 230px;
   max-width: 230px;
@@ -288,12 +317,14 @@ button#people-view-list-toggle {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
+  overflow: hidden !important;
 }
 
 #people-view-icon-toggle button::before,
 button#people-view-icon-toggle::before,
 #people-view-list-toggle button::before,
 button#people-view-list-toggle::before {
+  display: inline-block;
   color: currentColor;
   font-size: 1.03rem;
   font-weight: 700;
@@ -302,7 +333,19 @@ button#people-view-list-toggle::before {
 
 #people-view-icon-toggle button::before,
 button#people-view-icon-toggle::before {
-  content: "▦";
+  content: "";
+  width: 14px;
+  height: 14px;
+  background:
+    linear-gradient(currentColor 0 0) 0 0 / 3px 3px no-repeat,
+    linear-gradient(currentColor 0 0) 50% 0 / 3px 3px no-repeat,
+    linear-gradient(currentColor 0 0) 100% 0 / 3px 3px no-repeat,
+    linear-gradient(currentColor 0 0) 0 50% / 3px 3px no-repeat,
+    linear-gradient(currentColor 0 0) 50% 50% / 3px 3px no-repeat,
+    linear-gradient(currentColor 0 0) 100% 50% / 3px 3px no-repeat,
+    linear-gradient(currentColor 0 0) 0 100% / 3px 3px no-repeat,
+    linear-gradient(currentColor 0 0) 50% 100% / 3px 3px no-repeat,
+    linear-gradient(currentColor 0 0) 100% 100% / 3px 3px no-repeat;
 }
 
 #people-view-list-toggle button::before,
@@ -344,7 +387,7 @@ button#people-view-icon-toggle:focus-visible,
 #people-view-list-toggle button:focus-visible,
 button#people-view-list-toggle:hover,
 button#people-view-list-toggle:focus-visible {
-  box-shadow: 0 0 0 2px rgba(47, 158, 104, 0.2) !important;
+  box-shadow: inset 0 0 0 2px rgba(47, 158, 104, 0.2) !important;
 }
 
 .people-grid {
@@ -660,9 +703,9 @@ button#people-view-list-toggle:focus-visible {
 
   #people-search {
     margin-left: 0;
-    flex: 0 0 min(68vw, 360px) !important;
-    width: min(68vw, 360px) !important;
-    max-width: 360px !important;
+    flex: 0 0 min(58vw, 300px) !important;
+    width: min(58vw, 300px) !important;
+    max-width: 300px !important;
     min-width: 240px !important;
   }
 
@@ -688,13 +731,18 @@ button#people-view-list-toggle:focus-visible {
   }
 
   #people-search {
-    flex: 0 0 min(70vw, 300px) !important;
-    width: min(70vw, 300px) !important;
-    max-width: 300px !important;
-    min-width: 220px !important;
+    flex: 0 0 min(66vw, 260px) !important;
+    width: min(66vw, 260px) !important;
+    max-width: 260px !important;
+    min-width: 200px !important;
   }
 
-  #people-tag-filter,
+  #people-tag-filter {
+    width: min(42vw, 190px);
+    max-width: 190px;
+    min-width: 130px;
+  }
+
   #people-tool-filter {
     width: min(48vw, 220px);
     max-width: 220px;

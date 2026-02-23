@@ -539,11 +539,27 @@ button#the-list-card-edit-btn:focus-visible {
 }
 
 #person-detail-markdown {
-  border: 1px solid var(--receta-border);
-  border-radius: 16px;
-  background: #f6f6f5;
-  padding: 1.25rem;
-  box-shadow: 0 8px 22px rgba(31, 41, 51, 0.06);
+  --block-padding: 0;
+  --block-border-width: 0;
+  --block-background-fill: transparent;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+#person-detail-markdown > .wrap,
+#person-detail-markdown .html-container,
+#person-detail-markdown .prose {
+  width: 100%;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 .recipe-markdown-layout {
@@ -1394,10 +1410,6 @@ body.the-list-card-image-crop-open {
 
   #recipe-editor-grid > * {
     min-width: 0;
-  }
-
-  #person-detail-markdown {
-    padding: 1rem;
   }
 
   .recipe-markdown-layout {

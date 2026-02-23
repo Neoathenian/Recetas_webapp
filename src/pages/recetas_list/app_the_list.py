@@ -644,13 +644,6 @@ def make_the_list_app() -> gr.Blocks:
                         container=False,
                         elem_id="people-tool-filter",
                     )
-                    gr.Button(
-                        "+",
-                        variant="secondary",
-                        elem_id="the-list-create-profile-trigger",
-                        scale=0,
-                        min_width=40,
-                    )
                     verified_only_toggle = gr.Button(
                         VERIFIED_ONLY_BUTTON_LABEL,
                         variant="primary",
@@ -671,6 +664,13 @@ def make_the_list_app() -> gr.Blocks:
                         elem_id="people-view-list-toggle",
                         scale=0,
                         min_width=42,
+                    )
+                    gr.Button(
+                        "+",
+                        variant="secondary",
+                        elem_id="the-list-create-profile-trigger",
+                        scale=0,
+                        min_width=40,
                     )
 
             tag_filter_selection_state = gr.State([])
