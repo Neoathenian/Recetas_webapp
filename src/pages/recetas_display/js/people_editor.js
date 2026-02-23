@@ -2634,10 +2634,15 @@
     setComponentValue(DETAIL_VERIFY_STATE_ID, nextState ? "true" : "false");
 
     const shell = document.getElementById(CARD_PROPOSAL_SHELL_ID);
+    const editing = isElementVisible(shell);
+    if (editing) {
+      // In edit mode this acts as a staged field value. Persist only on Guardar.
+      return;
+    }
+
     const row = getCardProposalActionsRow();
     const slot = getCardInlineActionsSlot();
     if (
-      isElementVisible(shell) &&
       row instanceof HTMLElement &&
       shell instanceof HTMLElement &&
       slot instanceof HTMLElement &&
