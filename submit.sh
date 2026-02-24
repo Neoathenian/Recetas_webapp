@@ -93,8 +93,8 @@ gcloud run deploy "$DEPLOY_NAME" \
   --region "$REGION" \
   --allow-unauthenticated \
   --port 8087 \
-  --cpu 2 \
-  --memory 4Gi \
+  --cpu 1 \
+  --memory 1Gi \
   --timeout 3600 \
   --args="--env=$ENV_NAME" \
   --set-secrets="SERVICE_ACCOUNT_KEY=service_account_key:latest","ENV_FILE=env_file:latest" \
