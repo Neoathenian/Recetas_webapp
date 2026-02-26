@@ -16,6 +16,7 @@ import gradio as gr
 from src.gcs_storage import media_path, upload_bytes
 from src.page_timing import timed_page_load
 from src.pages.header import render_header, with_light_mode_head
+from src.recipe_importer import import_recipe_from_path_or_text, recipe_payload_to_form_values
 from src.pages.recetas_list.core_the_list import (
     DEFAULT_CARD_COLOR,
     _fetch_all_people,
@@ -217,6 +218,194 @@ def _extract_upload_path(uploaded_image: object) -> str:
     return ""
 
 
+def _extract_upload_paths(uploaded_files: object) -> List[str]:
+    paths: List[str] = []
+    seen: set[str] = set()
+
+    def _walk(value: object):
+        if value is None or value is False:
+            return
+        if isinstance(value, (list, tuple)):
+            for item in value:
+                _walk(item)
+            return
+        candidate = _extract_upload_path(value).strip()
+        if not candidate or candidate in seen:
+            return
+        seen.add(candidate)
+        paths.append(candidate)
+
+    _walk(uploaded_files)
+    return paths
+
+
+def _render_recipe_import_file_list(uploaded_files: object):
+    selected_paths = _extract_upload_paths(uploaded_files)
+    if not selected_paths:
+        return (
+            gr.update(value="", visible=False),
+            gr.update(value="", visible=False),
+        )
+
+    file_items = "".join(
+        (
+            "<li>"
+            "<span class='recipe-import-file-chip'>"
+            f"<span class='recipe-import-file-chip__label'>{html.escape(Path(path).name)}</span>"
+            "<button "
+            "type='button' "
+            "class='recipe-import-file-chip__remove' "
+            f"data-recipe-import-remove-index='{index}' "
+            "aria-label='Quitar archivo'>x</button>"
+            "</span>"
+            "</li>"
+        )
+        for index, path in enumerate(selected_paths)
+    )
+    summary = f"{len(selected_paths)} archivo{'s' if len(selected_paths) != 1 else ''} seleccionado{'s' if len(selected_paths) != 1 else ''}."
+    html_value = (
+        "<div class='recipe-import-file-list__wrap'>"
+        f"<div class='recipe-import-file-list__summary'>{html.escape(summary)}</div>"
+        f"<ul class='recipe-import-file-list__items'>{file_items}</ul>"
+        "</div>"
+    )
+    return (
+        gr.update(value=html_value, visible=True),
+        gr.update(value="", visible=False),
+    )
+
+
+def _append_recipe_import_file_selection(current_selected_files: object, uploaded_files: object):
+    existing_paths = _extract_upload_paths(current_selected_files)
+    incoming_paths = _extract_upload_paths(uploaded_files)
+    merged_paths: List[str] = list(existing_paths)
+    seen: set[str] = set(existing_paths)
+    for path in incoming_paths:
+        if path in seen:
+            continue
+        seen.add(path)
+        merged_paths.append(path)
+
+    file_list_update, status_update = _render_recipe_import_file_list(merged_paths)
+    return (
+        merged_paths,
+        file_list_update,
+        status_update,
+    )
+
+
+def _remove_recipe_import_file_selection(current_selected_files: object, remove_index: str):
+    selected_paths = _extract_upload_paths(current_selected_files)
+    try:
+        index = int(str(remove_index or "").strip())
+    except ValueError:
+        file_list_update, status_update = _render_recipe_import_file_list(selected_paths)
+        return (
+            selected_paths,
+            file_list_update,
+            status_update,
+        )
+
+    if 0 <= index < len(selected_paths):
+        selected_paths = [path for i, path in enumerate(selected_paths) if i != index]
+
+    file_list_update, status_update = _render_recipe_import_file_list(selected_paths)
+    return (
+        selected_paths,
+        file_list_update,
+        status_update,
+    )
+
+
+def _is_unspecified_recipe_value(value: object) -> bool:
+    text = str(value or "").strip().lower()
+    return text in {"", "no especificado", "receta"}
+
+
+def _merge_recipe_import_payloads(payloads: Sequence[Dict[str, object]]) -> Dict[str, object]:
+    merged: Dict[str, object] = {
+        "Name": "Receta",
+        "Ingredients": {},
+        "Steps": [],
+        "Preparation time": "No especificado",
+        "Total time": "No especificado",
+        "Nºpersonas": "No especificado",
+        "card image": DEFAULT_CARD_COLOR,
+        "Tags": [],
+        "Tools": [],
+    }
+
+    merged_ingredients: Dict[str, str] = {}
+    ingredient_seen: set[str] = set()
+    step_seen: set[str] = set()
+    tag_seen: set[str] = set()
+    tool_seen: set[str] = set()
+
+    for payload in payloads:
+        if not isinstance(payload, dict):
+            continue
+
+        candidate_name = str(payload.get("Name") or "").strip()
+        if candidate_name and _is_unspecified_recipe_value(merged.get("Name")) and not _is_unspecified_recipe_value(candidate_name):
+            merged["Name"] = candidate_name
+
+        for key in ("Preparation time", "Total time", "Nºpersonas"):
+            if _is_unspecified_recipe_value(merged.get(key)) and not _is_unspecified_recipe_value(payload.get(key)):
+                merged[key] = str(payload.get(key) or "").strip()
+
+        card_color = str(payload.get("card image") or payload.get("card_image") or "").strip()
+        if card_color and str(merged.get("card image") or "").strip() == DEFAULT_CARD_COLOR:
+            merged["card image"] = card_color
+
+        raw_ingredients = payload.get("Ingredients")
+        if isinstance(raw_ingredients, dict):
+            for raw_name, raw_amount in raw_ingredients.items():
+                ingredient_name = str(raw_name or "").strip()
+                ingredient_amount = str(raw_amount or "").strip()
+                if not ingredient_name and not ingredient_amount:
+                    continue
+                ingredient_key = ingredient_name.lower()
+                if ingredient_key and ingredient_key not in ingredient_seen:
+                    ingredient_seen.add(ingredient_key)
+                    merged_ingredients[ingredient_name] = ingredient_amount
+                    continue
+                if ingredient_key:
+                    existing_value = str(merged_ingredients.get(ingredient_name) or "").strip()
+                    if not existing_value and ingredient_amount:
+                        merged_ingredients[ingredient_name] = ingredient_amount
+
+        raw_steps = payload.get("Steps")
+        if isinstance(raw_steps, list):
+            for raw_step in raw_steps:
+                step_text = str(raw_step or "").strip()
+                if not step_text:
+                    continue
+                step_key = step_text.lower()
+                if step_key in step_seen:
+                    continue
+                step_seen.add(step_key)
+                cast_steps = merged.setdefault("Steps", [])
+                if isinstance(cast_steps, list):
+                    cast_steps.append(step_text)
+
+        for field_name, seen_set in (("Tags", tag_seen), ("Tools", tool_seen)):
+            raw_values = payload.get(field_name)
+            if not isinstance(raw_values, list):
+                continue
+            target = merged.setdefault(field_name, [])
+            if not isinstance(target, list):
+                continue
+            for item in raw_values:
+                text = str(item or "").strip().lower()
+                if not text or text in seen_set:
+                    continue
+                seen_set.add(text)
+                target.append(text)
+
+    merged["Ingredients"] = merged_ingredients
+    return merged
+
+
 def _extract_upload_image_bytes(uploaded_image: object) -> tuple[bytes | None, str, str]:
     upload_path = _extract_upload_path(uploaded_image)
     if not upload_path:
@@ -361,6 +550,10 @@ def _empty_page_state(title_html: str, detail_html: str, page_message: str = "")
         "",
         gr.update(value="", visible=False),
         gr.update(value=None),
+        gr.update(value="Upload", visible=False),
+        gr.update(visible=False),
+        gr.update(visible=False),
+        gr.update(value="", visible=False),
     )
 
 
@@ -406,6 +599,10 @@ def _recipe_page_state(
         form["image_route"],
         gr.update(value=card_message, visible=bool(card_message)),
         gr.update(value=None),
+        gr.update(value="Upload", visible=editing),
+        gr.update(visible=False),
+        gr.update(visible=False),
+        gr.update(value="", visible=False),
     )
 
 
@@ -578,8 +775,6 @@ def _save_recipe_edits(
     clean_name = str(card_proposal_name or "").strip() or str(existing_payload.get("Name") or "Receta")
     clean_total_time = str(card_proposal_total_time or "").strip() or "No especificado"
     clean_persons = str(card_proposal_persons or "").strip() or "No especificado"
-    # Card color is legacy fallback only; image is the authoritative card visual.
-    clean_card_color = str(existing_payload.get("card image") or DEFAULT_CARD_COLOR).strip() or DEFAULT_CARD_COLOR
     clean_tags = _parse_inline_values(card_proposal_tags)
     clean_tools = _parse_inline_values(card_proposal_tools)
     ingredients = _parse_ingredients_input(edit_ingredients)
@@ -650,7 +845,8 @@ def _save_recipe_edits(
     next_payload["Total time"] = clean_total_time
     next_payload["Nºpersonas"] = clean_persons
     next_payload["Verified"] = verified_value
-    next_payload["card image"] = clean_card_color
+    next_payload.pop("card image", None)
+    next_payload.pop("card_image", None)
     next_payload["Tags"] = clean_tags
     next_payload["Tools"] = clean_tools
     if image_route:
@@ -689,6 +885,139 @@ def _save_recipe_edits(
         normalized_slug,
         editing=False,
         page_message="✅ Receta actualizada.",
+    )
+
+
+def _import_recipe_into_editor(
+    imported_files: object,
+    imported_text: str,
+):
+    no_change = (
+        gr.update(),
+        gr.update(),
+        gr.update(),
+        gr.update(),
+        gr.update(),
+        gr.update(),
+        gr.update(),
+        gr.update(),
+        gr.update(),
+        gr.update(),
+    )
+    upload_paths = _extract_upload_paths(imported_files)
+    raw_text = str(imported_text or "").strip()
+    if not upload_paths and not raw_text:
+        return (
+            *no_change[:-2],
+            gr.update(value="❌ Sube un archivo o pega texto para importar.", visible=True),
+            gr.update(value="❌ Sube un archivo o pega texto para importar.", visible=True),
+        )
+
+    try:
+        imported_payloads: List[Dict[str, object]] = []
+        success_labels: List[str] = []
+        failed_labels: List[str] = []
+        image_data_url = ""
+        image_source = ""
+
+        for upload_path in upload_paths:
+            try:
+                imported = import_recipe_from_path_or_text(upload_path, "", force_english=False)
+            except Exception as file_exc:  # noqa: BLE001
+                logger.exception("Recipe file import failed (%s): %s", upload_path, file_exc)
+                failed_labels.append(f"{Path(upload_path).name}: {file_exc}")
+                continue
+
+            payload = dict(imported.get("payload") or {})
+            imported_payloads.append(payload)
+            source_label = str(imported.get("source_label") or Path(upload_path).name).strip()
+            success_labels.append(source_label)
+            candidate_image_data_url = str(imported.get("image_data_url") or "").strip()
+            candidate_image_source = str(imported.get("image_source") or "").strip()
+            if candidate_image_data_url and not image_data_url:
+                image_data_url = candidate_image_data_url
+                image_source = candidate_image_source
+
+        if raw_text:
+            try:
+                text_import = import_recipe_from_path_or_text(None, raw_text, force_english=False)
+                imported_payloads.append(dict(text_import.get("payload") or {}))
+                success_labels.append("texto manual")
+            except Exception as text_exc:  # noqa: BLE001
+                logger.exception("Manual text import failed: %s", text_exc)
+                if imported_payloads:
+                    failed_labels.append(f"texto manual: {text_exc}")
+                else:
+                    raise
+
+        if not imported_payloads:
+            raise ValueError("No se pudo importar ningún archivo ni texto válido.")
+
+        merged_payload = _merge_recipe_import_payloads(imported_payloads)
+        form_values = recipe_payload_to_form_values(merged_payload)
+
+        details: list[str] = []
+        if upload_paths:
+            ok_count = len(success_labels) - (1 if raw_text and "texto manual" in success_labels else 0)
+            if ok_count:
+                details.append(
+                    f"✅ {ok_count} archivo{'s' if ok_count != 1 else ''} analizado{'s' if ok_count != 1 else ''}."
+                )
+            if failed_labels:
+                details.append(
+                    f"⚠️ {len(failed_labels)} archivo{'s' if len(failed_labels) != 1 else ''} fallaron."
+                )
+        if raw_text:
+            details.append("Texto manual incluido en el análisis.")
+        if image_data_url:
+            if image_source:
+                details.append(f"Imagen usada: `{image_source}`.")
+            details.append("La imagen se aplicará al guardar la receta.")
+        elif upload_paths:
+            details.append("No se detectó imagen utilizable en los archivos.")
+        if failed_labels:
+            details.append("Errores: " + " | ".join(failed_labels[:3]))
+            if len(failed_labels) > 3:
+                details.append(f"(+{len(failed_labels) - 3} errores más)")
+
+        return (
+            form_values["name"],
+            form_values["tags_text"],
+            form_values["tools_text"],
+            form_values["total_time"],
+            form_values["persons"],
+            image_data_url,
+            form_values["ingredients_text"],
+            form_values["steps_text"],
+            gr.update(value=" ".join(details), visible=True),
+            gr.update(value=" ".join(details), visible=True),
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Recipe import failed: %s", exc)
+        return (
+            *no_change[:-2],
+            gr.update(value=f"❌ No se pudo importar la receta: {exc}", visible=True),
+            gr.update(value=f"❌ No se pudo importar la receta: {exc}", visible=True),
+        )
+
+
+def _open_recipe_import_modal():
+    return (
+        gr.update(visible=True),
+        gr.update(visible=True),
+        gr.update(value="", visible=False),
+        gr.update(value="", visible=False),
+        [],
+    )
+
+
+def _close_recipe_import_modal():
+    return (
+        gr.update(visible=False),
+        gr.update(visible=False),
+        gr.update(value="", visible=False),
+        gr.update(value="", visible=False),
+        [],
     )
 
 
@@ -776,6 +1105,12 @@ def make_people_display_app() -> gr.Blocks:
         with gr.Column(elem_id="people-shell"):
             with gr.Row(elem_id="people-title-row"):
                 title_md = gr.HTML("<h2>Recetas</h2>", elem_id="people-title")
+                recipe_import_open_btn = gr.Button(
+                    "Upload",
+                    visible=False,
+                    variant="secondary",
+                    elem_id="recipe-import-open-btn",
+                )
                 edit_btn = gr.Button(
                     EDIT_TOGGLE_BUTTON_LABEL,
                     visible=False,
@@ -860,6 +1195,72 @@ def make_people_display_app() -> gr.Blocks:
 
                 card_proposal_status = gr.Markdown(value="", visible=False, elem_id="the-list-card-proposal-status")
 
+            recipe_import_modal_backdrop = gr.Button(
+                "",
+                visible=False,
+                elem_id="recipe-import-modal-backdrop",
+                variant="secondary",
+            )
+            recipe_import_remove_index = gr.Textbox(
+                value="",
+                visible=False,
+                interactive=True,
+                elem_id="recipe-import-remove-index",
+            )
+            recipe_import_remove_trigger = gr.Button(
+                "_remove_recipe_import_file",
+                visible=False,
+                elem_id="recipe-import-remove-trigger",
+            )
+            recipe_import_files_state = gr.State([])
+            with gr.Column(visible=False, elem_id="recipe-import-modal") as recipe_import_modal:
+                with gr.Row(elem_id="recipe-import-modal-header"):
+                    gr.Markdown("**Importar receta (archivo y/o texto)**", elem_id="recipe-import-modal-title")
+                    recipe_import_close_btn = gr.Button(
+                        "x",
+                        variant="secondary",
+                        elem_id="recipe-import-modal-close-btn",
+                        scale=0,
+                        min_width=40,
+                    )
+                gr.Markdown(
+                    "Sube un archivo, pega texto, o combina ambos. Submit analizará las dos entradas juntas.",
+                    elem_id="recipe-import-modal-help",
+                )
+                with gr.Group(elem_id="recipe-import-group"):
+                    recipe_import_file = gr.UploadButton(
+                        "Subir archivo",
+                        file_types=[
+                            ".html", ".htm", ".docx", ".doc", ".pdf", ".txt",
+                            ".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp",
+                        ],
+                        file_count="multiple",
+                        variant="secondary",
+                        elem_id="recipe-import-file-btn",
+                    )
+                    recipe_import_file_list = gr.HTML(
+                        value="",
+                        visible=False,
+                        elem_id="recipe-import-file-list",
+                    )
+                    recipe_import_text = gr.Textbox(
+                        label="Texto (opcional)",
+                        lines=6,
+                        placeholder="Pega texto de la receta aquí (puede combinarse con el archivo).",
+                        elem_id="recipe-import-text",
+                    )
+                    recipe_import_modal_status = gr.Markdown(
+                        value="",
+                        visible=False,
+                        elem_id="recipe-import-modal-status",
+                    )
+                    with gr.Row(elem_id="recipe-import-submit-row"):
+                        recipe_import_submit_btn = gr.Button(
+                            "Submit",
+                            variant="primary",
+                            elem_id="recipe-import-submit-btn",
+                        )
+
             current_slug = gr.Textbox(value="", visible=False, interactive=False, elem_id="the-list-current-slug")
             current_name = gr.Textbox(value="", visible=False, interactive=False, elem_id="the-list-current-name")
             current_bucket = gr.Textbox(
@@ -928,6 +1329,10 @@ def make_people_display_app() -> gr.Blocks:
             image_route_state,
             card_proposal_status,
             card_proposal_image,
+            recipe_import_open_btn,
+            recipe_import_modal_backdrop,
+            recipe_import_modal,
+            recipe_import_modal_status,
         ]
 
         app.load(timed_page_load("/receta", _header_people_display), outputs=[hdr])
@@ -950,6 +1355,52 @@ def make_people_display_app() -> gr.Blocks:
             show_progress=False,
         )
 
+        recipe_import_open_btn.click(
+            timed_page_load("/receta", _open_recipe_import_modal, label="open_recipe_import_modal"),
+            outputs=[
+                recipe_import_modal_backdrop,
+                recipe_import_modal,
+                recipe_import_modal_status,
+                recipe_import_file_list,
+                recipe_import_files_state,
+            ],
+            show_progress=False,
+        )
+        recipe_import_close_btn.click(
+            timed_page_load("/receta", _close_recipe_import_modal, label="close_recipe_import_modal"),
+            outputs=[
+                recipe_import_modal_backdrop,
+                recipe_import_modal,
+                recipe_import_modal_status,
+                recipe_import_file_list,
+                recipe_import_files_state,
+            ],
+            show_progress=False,
+        )
+        recipe_import_modal_backdrop.click(
+            timed_page_load("/receta", _close_recipe_import_modal, label="close_recipe_import_modal_backdrop"),
+            outputs=[
+                recipe_import_modal_backdrop,
+                recipe_import_modal,
+                recipe_import_modal_status,
+                recipe_import_file_list,
+                recipe_import_files_state,
+            ],
+            show_progress=False,
+        )
+        recipe_import_file.upload(
+            timed_page_load("/receta", _append_recipe_import_file_selection, label="append_recipe_import_file_selection"),
+            inputs=[recipe_import_files_state, recipe_import_file],
+            outputs=[recipe_import_files_state, recipe_import_file_list, recipe_import_modal_status],
+            show_progress=False,
+        )
+        recipe_import_remove_trigger.click(
+            timed_page_load("/receta", _remove_recipe_import_file_selection, label="remove_recipe_import_file_selection"),
+            inputs=[recipe_import_files_state, recipe_import_remove_index],
+            outputs=[recipe_import_files_state, recipe_import_file_list, recipe_import_modal_status],
+            show_progress=False,
+        )
+
         submit_btn.click(
             timed_page_load("/receta", _save_recipe_edits, label="save_recipe_edits"),
             inputs=[
@@ -969,6 +1420,24 @@ def make_people_display_app() -> gr.Blocks:
             ],
             outputs=page_state_outputs,
             show_progress=False,
+        )
+
+        recipe_import_submit_btn.click(
+            timed_page_load("/receta", _import_recipe_into_editor, label="import_recipe_into_editor"),
+            inputs=[recipe_import_files_state, recipe_import_text],
+            outputs=[
+                card_proposal_name,
+                card_proposal_tags,
+                card_proposal_tools,
+                card_proposal_total_time,
+                card_proposal_persons,
+                card_proposal_image_data,
+                edit_ingredients_input,
+                edit_steps_input,
+                card_proposal_status,
+                recipe_import_modal_status,
+            ],
+            show_progress=True,
         )
         detail_verify_trigger.click(
             timed_page_load(

@@ -23,9 +23,9 @@ def setup_secrets(env: str) -> dict[str, Path]:
         "ENV_FILE": _SECRETS_DIR / f"env.{env}",
     }
     if env == "prod":
-        secret_files_path["SERVICE_ACCOUNT_KEY"] = _SECRETS_DIR / "the-list-webapp-prod-sa.json"
+        secret_files_path["SERVICE_ACCOUNT_KEY"] = _SECRETS_DIR / "recetas-webapp-prod-sa.json"
     elif env == "dev":
-        secret_files_path["SERVICE_ACCOUNT_KEY"] = _SECRETS_DIR / "the-list-webapp-dev-sa.json"
+        secret_files_path["SERVICE_ACCOUNT_KEY"] = _SECRETS_DIR / "recetas-webapp-dev-sa.json"
 
     for env_var, file_path in secret_files_path.items():
         value = os.environ.get(env_var)

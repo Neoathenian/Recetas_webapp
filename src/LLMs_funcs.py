@@ -28,9 +28,14 @@ except ModuleNotFoundError:  # pragma: no cover - optional dependency
 try:
     from google import genai  # type: ignore
     from google.genai import errors as genai_errors  # type: ignore
+    try:
+        from google.genai import types as genai_types  # type: ignore
+    except Exception:  # pragma: no cover - optional dependency shape can vary
+        genai_types = None
 except ModuleNotFoundError:  # pragma: no cover - optional dependency
     genai = None
     genai_errors = None
+    genai_types = None
 
 try:
     from unidecode import unidecode
@@ -565,6 +570,7 @@ def normalize_recipe_webapp_payload(
 ) -> dict:
     if not isinstance(payload, dict):
         payload = {}
+    _ = default_card_color  # legacy arg kept for call-site compatibility; color fallback is code-side only
 
     normalized = {
         "Name": str(payload.get("Name") or payload.get("name") or "").strip() or "Receta",
@@ -580,8 +586,6 @@ def normalize_recipe_webapp_payload(
         or "No especificado",
         "Nºpersonas": str(payload.get("Nºpersonas") or payload.get("n_personas") or payload.get("persons") or "").strip()
         or "No especificado",
-        "card image": str(payload.get("card image") or payload.get("card_image") or default_card_color).strip()
-        or default_card_color,
         "Tags": _normalize_recipe_list(payload.get("Tags") if "Tags" in payload else payload.get("tags")),
         "Tools": _normalize_recipe_list(payload.get("Tools") if "Tools" in payload else payload.get("tools")),
     }
@@ -623,6 +627,84 @@ def recipe_text_to_webapp_json(
         contents=doc,
         config={
             "system_instruction": prompt,
+            "response_mime_type": "application/json",
+        },
+    )
+    raw_output = str(response or "").strip()
+    json_text = _extract_json_text(raw_output)
+    parsed: dict
+    try:
+        parsed = json.loads(json_text)
+    except Exception:
+        if json5 is not None:
+            try:
+                parsed = json5.loads(json_text)
+            except Exception:
+                parsed = {}
+        else:
+            parsed = {}
+    return normalize_recipe_webapp_payload(parsed, default_card_color=default_card_color)
+
+
+def recipe_file_to_webapp_json(
+    file_bytes: bytes,
+    mime_type: str,
+    *,
+    context_text: str = "",
+    model=default_model,
+    force_english: bool = False,
+    default_card_color: str = "rgb(118, 161, 146)",
+) -> dict:
+    if _GENAI_CLIENT is None:
+        raise RuntimeError(
+            "google-genai is not installed. Install it (for example: `pip install google-genai`) "
+            "to use Gemini-backed helpers in src/LLMs_funcs.py."
+        )
+    if not file_bytes:
+        raise ValueError("file_bytes is empty")
+
+    key_list = "\n".join(f"- {key}" for key in RECIPE_WEBAPP_KEYS)
+    language_line = (
+        "Return all free-text values in English.\n"
+        if force_english
+        else "Return all free-text values in Spanish.\n"
+    )
+    system_prompt = f"""
+        Convert the attached file into a recipe JSON object for a web application.
+        The file may be an image or a document that requires OCR/reading.
+        Return JSON only (no markdown, no comments), using exactly these keys:
+        {key_list}
+
+        Rules:
+        - "Ingredients" must be a JSON object mapping ingredient name -> amount.
+        - "Steps", "Tags", and "Tools" must be JSON arrays of strings.
+        - If data is missing, use "No especificado" for time/servings, [] for lists, and {{}} for ingredients.
+        - Keep names and ingredient wording concise.
+        - Do not invent unsafe cooking instructions.
+        {language_line}
+    """
+
+    user_text = str(context_text or "").strip() or "Extrae la receta del archivo adjunto."
+    contents = None
+
+    if genai_types is not None and hasattr(genai_types, "Part"):
+        try:
+            file_part = genai_types.Part.from_bytes(data=file_bytes, mime_type=str(mime_type or "").strip() or "application/octet-stream")
+            contents = [user_text, file_part]
+        except Exception:
+            contents = None
+
+    if contents is None:
+        raise RuntimeError(
+            "This google-genai installation does not expose `types.Part.from_bytes`; "
+            "update `google-genai` to use Gemini OCR/file import."
+        )
+
+    response = _generate_content_with_fallback(
+        model=model,
+        contents=contents,
+        config={
+            "system_instruction": system_prompt,
             "response_mime_type": "application/json",
         },
     )

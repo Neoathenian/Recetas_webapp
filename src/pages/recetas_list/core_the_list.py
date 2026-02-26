@@ -261,7 +261,7 @@ def _recipe_from_payload(payload: Dict[str, object], slug_hint: str = "") -> Dic
         "preparation_time": preparation_time,
         "total_time": total_time,
         "persons": persons,
-        "card_image": _normalize_color(payload.get("card image") or payload.get("card_image")),
+        "card_image": DEFAULT_CARD_COLOR,
         "card_image_file": str(payload.get("card image file") or payload.get("card_image_file") or "").strip(),
         "tags": _parse_list(payload.get("Tags") or payload.get("tags")),
         "tools": _parse_list(payload.get("Tools") or payload.get("tools")),

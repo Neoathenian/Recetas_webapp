@@ -46,6 +46,38 @@
   min-width: 0 !important;
 }
 
+#recipe-import-open-btn {
+  margin-left: auto;
+  margin-top: 0 !important;
+  align-self: center !important;
+  flex: 0 0 auto !important;
+}
+
+#recipe-import-open-btn + #the-list-card-edit-btn {
+  margin-left: 0 !important;
+}
+
+#recipe-import-open-btn button,
+button#recipe-import-open-btn {
+  min-height: 38px !important;
+  height: 38px !important;
+  padding: 0 0.95rem !important;
+  border-radius: 999px !important;
+  border: 1px solid #bfd5f6 !important;
+  background: #ffffff !important;
+  color: #1e40af !important;
+  font-weight: 700 !important;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+}
+
+#recipe-import-open-btn button:hover,
+#recipe-import-open-btn button:focus-visible,
+button#recipe-import-open-btn:hover,
+button#recipe-import-open-btn:focus-visible {
+  background: #eff6ff !important;
+  border-color: #93c5fd !important;
+}
+
 #the-list-card-edit-btn button,
 button#the-list-card-edit-btn {
   min-width: 38px !important;
@@ -76,6 +108,347 @@ button#the-list-card-edit-btn:focus-visible {
 #the-list-card-proposal-status p,
 #the-list-card-proposal-help p {
   margin: 0;
+}
+
+#recipe-import-modal-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 1200 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+#recipe-import-modal-backdrop button,
+button#recipe-import-modal-backdrop {
+  width: 100vw !important;
+  height: 100vh !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: rgba(15, 23, 42, 0.42) !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  box-shadow: none !important;
+}
+
+#recipe-import-modal {
+  position: fixed !important;
+  top: 5.5rem !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: min(780px, calc(100vw - 1.5rem)) !important;
+  z-index: 1250 !important;
+  margin: 0 !important;
+  border: 1px solid #d8dde1 !important;
+  border-radius: 18px !important;
+  background: #ffffff !important;
+  box-shadow: 0 24px 52px rgba(15, 23, 42, 0.28) !important;
+  padding: 1rem !important;
+  overflow: hidden !important;
+}
+
+#recipe-import-modal > .wrap {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
+}
+
+#recipe-import-modal .gr-block,
+#recipe-import-modal .gr-group,
+#recipe-import-modal .gradio-group,
+#recipe-import-modal .gradio-column,
+#recipe-import-modal .gradio-row {
+  background: transparent !important;
+}
+
+#recipe-import-modal-header {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0 0.35rem 0 !important;
+  padding-right: 2.85rem;
+  min-height: 2.2rem;
+}
+
+#recipe-import-modal-title {
+  margin: 0;
+  flex: 1 1 auto;
+}
+
+#recipe-import-modal-title p {
+  margin: 0;
+  font-size: 1rem;
+}
+
+#recipe-import-modal-help {
+  margin: 0 0 0.65rem 0 !important;
+}
+
+#recipe-import-modal-help p {
+  margin: 0 !important;
+  color: #5f6c76;
+  font-size: 0.9rem;
+}
+
+#recipe-import-modal-close-btn {
+  position: absolute !important;
+  top: 0.7rem !important;
+  right: 0.7rem !important;
+  margin: 0 !important;
+  z-index: 3 !important;
+  flex: 0 0 auto !important;
+}
+
+#recipe-import-modal-close-btn button,
+button#recipe-import-modal-close-btn {
+  min-width: 34px !important;
+  width: 34px !important;
+  height: 34px !important;
+  padding: 0 !important;
+  border-radius: 999px !important;
+  border: 1px solid #d0d7de !important;
+  background: #ffffff !important;
+  color: #334155 !important;
+  font-weight: 700 !important;
+}
+
+#recipe-import-modal-close-btn button:hover,
+#recipe-import-modal-close-btn button:focus-visible,
+button#recipe-import-modal-close-btn:hover,
+button#recipe-import-modal-close-btn:focus-visible {
+  background: #f8fafc !important;
+  border-color: #93c5fd !important;
+}
+
+#recipe-import-group {
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 12px !important;
+  padding: 0.85rem !important;
+  background: #ffffff !important;
+}
+
+#recipe-import-group > .wrap,
+#recipe-import-group .gr-block,
+#recipe-import-group .gradio-row,
+#recipe-import-group .gradio-column {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+#recipe-import-row {
+  gap: 0.7rem;
+  align-items: center;
+}
+
+#recipe-import-file-btn button,
+button#recipe-import-file-btn,
+#recipe-import-submit-btn button,
+button#recipe-import-submit-btn {
+  border-radius: 10px !important;
+  font-weight: 700 !important;
+}
+
+#recipe-import-file-btn {
+  margin: 0 0 0.25rem 0 !important;
+}
+
+#recipe-import-file-btn button,
+button#recipe-import-file-btn {
+  width: 100% !important;
+  min-height: 44px !important;
+  border: 1px dashed #93c5fd !important;
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+  box-shadow: none !important;
+}
+
+#recipe-import-file-btn button:hover,
+#recipe-import-file-btn button:focus-visible,
+button#recipe-import-file-btn:hover,
+button#recipe-import-file-btn:focus-visible {
+  border-color: #60a5fa !important;
+  background: #dbeafe !important;
+}
+
+#recipe-import-text {
+  margin-top: 0.6rem;
+}
+
+#recipe-import-file-list {
+  margin-top: 0.55rem;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  --block-background-fill: transparent !important;
+  --block-border-width: 0px !important;
+}
+
+#recipe-import-file-list .html-container,
+#recipe-import-file-list .prose,
+#recipe-import-file-list > .wrap,
+#recipe-import-file-list .gr-block,
+#recipe-import-file-list .gradio-html,
+#recipe-import-file-list [class*="wrap"],
+#recipe-import-file-list [class*="container"] {
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.recipe-import-file-list__wrap {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
+}
+
+.recipe-import-file-list__summary {
+  margin: 0 0 0.35rem 0;
+  color: #1e40af;
+  font-weight: 700;
+  font-size: 0.86rem;
+}
+
+.recipe-import-file-list__items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.recipe-import-file-list__items li {
+  margin: 0;
+  padding: 0;
+}
+
+.recipe-import-file-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  gap: 0.3rem;
+  padding: 0.12rem 0.2rem 0.12rem 0.48rem;
+  border-radius: 999px;
+  border: 1px solid #bfd5f6;
+  background: #ffffff;
+  color: #334155;
+  font-size: 0.78rem;
+  line-height: 1.15;
+}
+
+.recipe-import-file-chip__label {
+  max-width: min(58vw, 480px);
+  overflow-wrap: anywhere;
+}
+
+.recipe-import-file-chip__remove {
+  width: 1.35rem;
+  height: 1.35rem;
+  min-width: 1.35rem;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
+  padding: 0;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.recipe-import-file-chip__remove:hover,
+.recipe-import-file-chip__remove:focus-visible {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+#recipe-import-modal-status {
+  margin-top: 0.55rem;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  --block-background-fill: transparent !important;
+  --block-border-width: 0px !important;
+}
+
+#recipe-import-modal-status > .wrap,
+#recipe-import-modal-status .markdown,
+#recipe-import-modal-status .prose,
+#recipe-import-modal-status [class*="wrap"],
+#recipe-import-modal-status [class*="container"] {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+#recipe-import-modal-status p {
+  margin: 0;
+}
+
+#recipe-import-submit-row {
+  margin-top: 0.75rem !important;
+  justify-content: flex-end;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  --block-background-fill: transparent !important;
+  --block-border-width: 0px !important;
+}
+
+#recipe-import-submit-row > .wrap,
+#recipe-import-submit-row .gr-block,
+#recipe-import-submit-row .gradio-row,
+#recipe-import-submit-row .gradio-column,
+#recipe-import-submit-row [class*="wrap"],
+#recipe-import-submit-row [class*="container"] {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+#recipe-import-submit-btn {
+  flex: 0 0 auto !important;
+  min-width: 150px !important;
+}
+
+#recipe-import-submit-btn button,
+button#recipe-import-submit-btn {
+  min-height: 42px !important;
+  border: 1px solid #ea580c !important;
+  background: #f97316 !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 18px rgba(249, 115, 22, 0.25) !important;
+}
+
+#recipe-import-submit-btn button:hover,
+#recipe-import-submit-btn button:focus-visible,
+button#recipe-import-submit-btn:hover,
+button#recipe-import-submit-btn:focus-visible {
+  border-color: #c2410c !important;
+  background: #ea580c !important;
 }
 
 #person-detail-hero,
@@ -1439,6 +1812,40 @@ body.the-list-card-image-crop-open {
 @media (max-width: 720px) {
   #people-title-row {
     align-items: center;
+    flex-wrap: wrap;
+  }
+
+  #recipe-import-open-btn {
+    margin-left: 0;
+  }
+
+  #recipe-import-open-btn + #the-list-card-edit-btn {
+    margin-left: 0 !important;
+  }
+
+  #recipe-import-modal {
+    top: 0.75rem !important;
+    width: calc(100vw - 0.75rem) !important;
+    padding: 0.8rem !important;
+  }
+
+  #recipe-import-modal > .wrap {
+    padding: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  #recipe-import-modal-header {
+    padding-right: 2.5rem;
+  }
+
+  #recipe-import-submit-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  #recipe-import-submit-btn {
+    min-width: 0 !important;
+    width: 100% !important;
   }
 
   #the-list-card-proposal-actions {

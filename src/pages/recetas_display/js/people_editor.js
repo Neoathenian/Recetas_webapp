@@ -53,6 +53,9 @@
   const DETAIL_VERIFY_PAYLOAD_ID = "recipe-detail-verify-payload";
   const DETAIL_VERIFY_TRIGGER_ID = "recipe-detail-verify-trigger";
   const DETAIL_VERIFY_STATE_ID = "recipe-verified-state";
+  const RECIPE_IMPORT_FILE_LIST_ID = "recipe-import-file-list";
+  const RECIPE_IMPORT_REMOVE_INDEX_ID = "recipe-import-remove-index";
+  const RECIPE_IMPORT_REMOVE_TRIGGER_ID = "recipe-import-remove-trigger";
   const CARD_IMAGE_CROP_MODAL_ID = "the-list-card-image-crop-modal";
   const CARD_IMAGE_CROP_VIEW_WIDTH = 360;
   const CARD_IMAGE_CROP_VIEW_HEIGHT = 270;
@@ -2681,6 +2684,34 @@
     });
   };
 
+  const bindRecipeImportFileChipRemovers = () => {
+    if (document.body.dataset.recipeImportFileChipRemoversBound === "1") return;
+    document.body.dataset.recipeImportFileChipRemoversBound = "1";
+
+    document.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const removeButton = target.closest(".recipe-import-file-chip__remove");
+      if (!(removeButton instanceof HTMLElement)) return;
+
+      const fileListHost = document.getElementById(RECIPE_IMPORT_FILE_LIST_ID);
+      if (!(fileListHost instanceof HTMLElement) || !fileListHost.contains(removeButton)) return;
+
+      const rawIndex = String(removeButton.dataset.recipeImportRemoveIndex || "").trim();
+      if (!/^\d+$/.test(rawIndex)) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      setComponentValue(RECIPE_IMPORT_REMOVE_INDEX_ID, rawIndex);
+      const triggerHost = document.getElementById(RECIPE_IMPORT_REMOVE_TRIGGER_ID);
+      const trigger = resolveButtonClickHost(triggerHost);
+      if (trigger instanceof HTMLElement) {
+        trigger.click();
+      }
+    }, true);
+  };
+
   const setNodeText = (node, value) => {
     if (!(node instanceof HTMLElement)) return;
     node.textContent = String(value || "");
@@ -4893,6 +4924,7 @@
         }, 0);
       }
     });
+    bindRecipeImportFileChipRemovers();
     refreshVisualEditor();
     refreshCompiledPreviewSnapshot();
   };
