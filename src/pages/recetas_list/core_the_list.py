@@ -1,22 +1,41 @@
 from __future__ import annotations
 
+import csv
 import html
+import io
 import json
 import logging
 import os
 import re
+import threading
 import time
 from typing import Dict, List, Sequence, Tuple
+from urllib.parse import unquote
 
 import gradio as gr
 from google.api_core.exceptions import NotFound
 
-from src.gcs_storage import download_bytes, get_bucket, storage_client, upload_bytes
+from src.gcs_storage import download_bytes, get_bucket, media_path, storage_client, upload_bytes
 
 TAG_FILTER_ALL_OPTION = "Todas"
 TOOL_FILTER_ALL_OPTION = "Todas"
 DEFAULT_CARD_COLOR = "rgb(118, 161, 146)"
 RECIPES_PREFIX = (os.getenv("RECETAS_RECIPES_PREFIX") or "recipes").strip("/ ")
+RECIPES_INDEX_BLOB = (
+    os.getenv("RECETAS_RECIPE_INDEX_BLOB") or f"{RECIPES_PREFIX}/recipes_index.csv"
+).strip("/ ")
+RECIPES_INDEX_CACHE_TTL_SECONDS = max(
+    0.0,
+    float(os.getenv("RECETAS_INDEX_CACHE_TTL_SECONDS") or "45"),
+)
+RECIPE_INDEX_FIELDNAMES = [
+    "slug",
+    "recipe_name",
+    "tags",
+    "tags_tools",
+    "Verified",
+    "image_location_in_bucket",
+]
 RGB_RE = re.compile(r"^rgb\s*\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$", re.IGNORECASE)
 TRANSPARENT_PIXEL_DATA_URL = "data:image/gif;base64,R0lGODlhAQABAAAAACw="
 RECIPE_ICON_TOTAL_TIME = (
@@ -37,6 +56,9 @@ RECIPE_ICON_PERSONS = (
 
 logger = logging.getLogger(__name__)
 timing_logger = logging.getLogger("uvicorn.error")
+_recipes_index_cache_lock = threading.Lock()
+_recipes_index_cache_loaded_at = 0.0
+_recipes_index_cache_recipes: List[Dict[str, object]] | None = None
 
 
 def _log_timing(event_name: str, start: float, **fields: object) -> None:
@@ -93,6 +115,10 @@ def _write_recipe_payload(slug: str, payload: Dict[str, object]) -> bool:
             content_type="application/json; charset=utf-8",
             cache_seconds=0,
         )
+        try:
+            _sync_recipe_index_row(slug, payload)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Failed syncing recipe index row for `%s`: %s", slug, exc)
         return True
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed writing recipe payload `%s`: %s", blob_name, exc)
@@ -269,6 +295,234 @@ def _recipe_from_payload(payload: Dict[str, object], slug_hint: str = "") -> Dic
     }
 
 
+def _normalize_recipe_image_bucket_path(value: object) -> str:
+    raw_value = str(value or "").strip()
+    if not raw_value:
+        return ""
+    if raw_value.startswith("/media/"):
+        return unquote(raw_value[len("/media/") :].lstrip("/"))
+    if raw_value.startswith("media/"):
+        return unquote(raw_value[len("media/") :].lstrip("/"))
+    if raw_value.startswith("http://") or raw_value.startswith("https://") or raw_value.startswith("data:"):
+        return ""
+    return raw_value.lstrip("/")
+
+
+def _recipe_index_record_from_recipe(recipe: Dict[str, object]) -> Dict[str, str]:
+    tags = [str(tag or "").strip().lower() for tag in recipe.get("tags", []) if str(tag or "").strip()]
+    tools = [str(tool or "").strip().lower() for tool in recipe.get("tools", []) if str(tool or "").strip()]
+    image_blob_name = _normalize_recipe_image_bucket_path(recipe.get("card_image_file"))
+    return {
+        "slug": _slugify(str(recipe.get("slug") or "")),
+        "recipe_name": str(recipe.get("name") or "Receta").strip() or "Receta",
+        "tags": ", ".join(tags),
+        "tags_tools": ", ".join(tools),
+        "Verified": "true" if bool(recipe.get("verified")) else "false",
+        "image_location_in_bucket": image_blob_name,
+    }
+
+
+def _recipe_index_record_from_payload(payload: Dict[str, object], slug_hint: str = "") -> Dict[str, str]:
+    return _recipe_index_record_from_recipe(_recipe_from_payload(payload, slug_hint=slug_hint))
+
+
+def _recipe_from_index_record(record: Dict[str, str]) -> Dict[str, object] | None:
+    slug = _slugify(record.get("slug") or record.get("recipe_name") or "")
+    if not slug:
+        return None
+
+    image_blob_name = _normalize_recipe_image_bucket_path(record.get("image_location_in_bucket"))
+    display_name = str(record.get("recipe_name") or _display_name_from_slug(slug)).strip() or _display_name_from_slug(slug)
+    return {
+        "slug": slug,
+        "name": display_name,
+        "ingredients": [],
+        "steps": [],
+        "preparation_time": "No especificado",
+        "total_time": "No especificado",
+        "persons": "No especificado",
+        "card_image": DEFAULT_CARD_COLOR,
+        "card_image_file": media_path(image_blob_name) if image_blob_name else "",
+        "tags": _parse_list(record.get("tags")),
+        "tools": _parse_list(record.get("tags_tools") or record.get("tools")),
+        "verified": _as_bool(record.get("Verified") if "Verified" in record else record.get("verified")),
+    }
+
+
+def _recipes_from_index_rows(rows: Sequence[Dict[str, str]]) -> List[Dict[str, object]]:
+    recipes_by_slug: Dict[str, Dict[str, object]] = {}
+    for row in rows or []:
+        recipe = _recipe_from_index_record(row)
+        if recipe is None:
+            continue
+        recipes_by_slug[str(recipe.get("slug") or "")] = recipe
+
+    recipes = list(recipes_by_slug.values())
+    recipes.sort(key=lambda row: str(row.get("name") or "").lower())
+    return recipes
+
+
+def _invalidate_recipes_index_cache() -> None:
+    global _recipes_index_cache_loaded_at, _recipes_index_cache_recipes
+    with _recipes_index_cache_lock:
+        _recipes_index_cache_loaded_at = 0.0
+        _recipes_index_cache_recipes = None
+
+
+def _set_recipes_index_cache(recipes: Sequence[Dict[str, object]]) -> None:
+    global _recipes_index_cache_loaded_at, _recipes_index_cache_recipes
+    cached_rows = [dict(row) for row in recipes]
+    with _recipes_index_cache_lock:
+        _recipes_index_cache_recipes = cached_rows
+        _recipes_index_cache_loaded_at = time.time()
+
+
+def _get_recipes_index_cache() -> List[Dict[str, object]] | None:
+    if RECIPES_INDEX_CACHE_TTL_SECONDS <= 0:
+        return None
+
+    with _recipes_index_cache_lock:
+        if _recipes_index_cache_recipes is None:
+            return None
+        age_seconds = time.time() - float(_recipes_index_cache_loaded_at or 0.0)
+        if age_seconds > RECIPES_INDEX_CACHE_TTL_SECONDS:
+            return None
+        return [dict(row) for row in _recipes_index_cache_recipes]
+
+
+def _read_recipe_index_csv_rows() -> List[Dict[str, str]] | None:
+    try:
+        raw_bytes = download_bytes(RECIPES_INDEX_BLOB)
+    except FileNotFoundError:
+        return None
+    except NotFound:
+        return None
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Failed downloading recipe index CSV `%s`: %s", RECIPES_INDEX_BLOB, exc)
+        return None
+
+    try:
+        csv_text = raw_bytes.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        logger.warning("Recipe index CSV `%s` is not valid UTF-8: %s", RECIPES_INDEX_BLOB, exc)
+        return None
+
+    reader = csv.DictReader(io.StringIO(csv_text))
+    rows: List[Dict[str, str]] = []
+    for raw_row in reader or []:
+        if not isinstance(raw_row, dict):
+            continue
+        clean_row: Dict[str, str] = {}
+        for raw_key, raw_value in raw_row.items():
+            key = str(raw_key or "").strip()
+            if not key:
+                continue
+            clean_row[key] = str(raw_value or "").strip()
+        if clean_row:
+            rows.append(clean_row)
+    return rows
+
+
+def _write_recipe_index_csv_rows(rows: Sequence[Dict[str, str]]) -> bool:
+    try:
+        output = io.StringIO()
+        writer = csv.DictWriter(output, fieldnames=RECIPE_INDEX_FIELDNAMES, extrasaction="ignore")
+        writer.writeheader()
+        for row in sorted(rows, key=lambda item: str(item.get("recipe_name") or "").lower()):
+            writer.writerow({field: str(row.get(field) or "") for field in RECIPE_INDEX_FIELDNAMES})
+        upload_bytes(
+            (output.getvalue() or "").encode("utf-8"),
+            RECIPES_INDEX_BLOB,
+            content_type="text/csv; charset=utf-8",
+            cache_seconds=0,
+        )
+        _set_recipes_index_cache(_recipes_from_index_rows(rows))
+        return True
+    except Exception as exc:  # noqa: BLE001
+        _invalidate_recipes_index_cache()
+        logger.exception("Failed writing recipe index CSV `%s`: %s", RECIPES_INDEX_BLOB, exc)
+        return False
+
+
+def _load_recipes_from_index_csv() -> List[Dict[str, object]] | None:
+    cached = _get_recipes_index_cache()
+    if cached is not None:
+        return cached
+
+    rows = _read_recipe_index_csv_rows()
+    if rows is None:
+        return None
+
+    recipes = _recipes_from_index_rows(rows)
+    _set_recipes_index_cache(recipes)
+    return recipes
+
+
+def _rebuild_recipe_index_from_bucket() -> List[Dict[str, object]]:
+    total_start = time.perf_counter()
+    recipes: List[Dict[str, object]] = []
+    index_rows: List[Dict[str, str]] = []
+
+    prefix = f"{RECIPES_PREFIX}/"
+    try:
+        client = storage_client()
+        bucket = client.bucket(get_bucket().name)
+        blobs = sorted(
+            (
+                str(getattr(blob, "name", "") or "").strip()
+                for blob in client.list_blobs(bucket, prefix=prefix)
+            ),
+            key=str.lower,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Failed listing recipe blobs for prefix `%s`: %s", prefix, exc)
+        _log_timing("rebuild_recipe_index.list_error", total_start, prefix=prefix)
+        return recipes
+
+    for blob_name in blobs:
+        if not blob_name.endswith(".json"):
+            continue
+        recipe = _load_recipe_from_blob(blob_name)
+        if recipe is None:
+            continue
+        recipes.append(recipe)
+        index_rows.append(_recipe_index_record_from_recipe(recipe))
+
+    recipes.sort(key=lambda row: str(row.get("name") or "").lower())
+    if not _write_recipe_index_csv_rows(index_rows):
+        logger.warning("Recipe index rebuild completed but CSV write failed for `%s`", RECIPES_INDEX_BLOB)
+        _set_recipes_index_cache(recipes)
+
+    _log_timing("rebuild_recipe_index.total", total_start, recipes=len(recipes))
+    return recipes
+
+
+def _sync_recipe_index_row(slug: str, payload: Dict[str, object]) -> None:
+    normalized_slug = _slugify(slug)
+    if not normalized_slug:
+        return
+
+    next_record = _recipe_index_record_from_payload(payload, slug_hint=normalized_slug)
+    existing_rows = _read_recipe_index_csv_rows()
+    if existing_rows is None:
+        _rebuild_recipe_index_from_bucket()
+        existing_rows = _read_recipe_index_csv_rows() or []
+
+    updated = False
+    for index, row in enumerate(existing_rows):
+        row_slug = _slugify(row.get("slug") or row.get("recipe_name") or "")
+        if row_slug != normalized_slug:
+            continue
+        existing_rows[index] = {**row, **next_record}
+        updated = True
+        break
+    if not updated:
+        existing_rows.append(next_record)
+
+    if not _write_recipe_index_csv_rows(existing_rows):
+        logger.warning("Recipe index row sync failed for slug `%s`", normalized_slug)
+
+
 def _load_recipe_from_blob(blob_name: str) -> Dict[str, object] | None:
     try:
         payload = json.loads(download_bytes(blob_name).decode("utf-8"))
@@ -288,43 +542,24 @@ def _load_recipe_from_blob(blob_name: str) -> Dict[str, object] | None:
 
 def _fetch_all_people() -> List[Dict[str, object]]:
     total_start = time.perf_counter()
-    recipes: List[Dict[str, object]] = []
-
-    prefix = f"{RECIPES_PREFIX}/"
-    try:
-        client = storage_client()
-        bucket = client.bucket(get_bucket().name)
-        blobs = sorted(
-            (
-                str(getattr(blob, "name", "") or "").strip()
-                for blob in client.list_blobs(bucket, prefix=prefix)
-            ),
-            key=str.lower,
-        )
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("Failed listing recipe blobs for prefix `%s`: %s", prefix, exc)
-        _log_timing("fetch_all_recipes.list_error", total_start, prefix=prefix)
+    recipes = _load_recipes_from_index_csv()
+    if recipes is not None:
+        _log_timing("fetch_all_recipes.index_total", total_start, recipes=len(recipes))
         return recipes
 
-    for blob_name in blobs:
-        if not blob_name.endswith(".json"):
-            continue
-        recipe = _load_recipe_from_blob(blob_name)
-        if recipe is None:
-            continue
-        recipes.append(recipe)
-
-    recipes.sort(key=lambda row: str(row.get("name") or "").lower())
-    _log_timing("fetch_all_recipes.total", total_start, recipes=len(recipes))
-    return recipes
+    rebuilt = _rebuild_recipe_index_from_bucket()
+    _log_timing("fetch_all_recipes.rebuild_total", total_start, recipes=len(rebuilt))
+    return rebuilt
 
 
 def _fetch_recipe_by_slug(slug: str) -> Dict[str, object] | None:
     normalized_slug = _slugify(slug)
-    for recipe in _fetch_all_people():
-        if str(recipe.get("slug") or "") == normalized_slug:
-            return recipe
-    return None
+    if not normalized_slug:
+        return None
+    payload = _read_recipe_payload(normalized_slug)
+    if payload is None:
+        return None
+    return _recipe_from_payload(payload, slug_hint=normalized_slug)
 
 
 def _build_filter_choices(

@@ -9,6 +9,7 @@
   const CREATE_PAGE_PATH = "/receta/?create=1";
   const VERIFY_PAYLOAD_ID = "recipe-verify-payload";
   const VERIFY_TRIGGER_ID = "recipe-verify-trigger";
+  const ICON_LOAD_MORE_TRIGGER_ID = "recipe-icon-load-more-trigger";
   const CARDS_HOST_ID = "people-cards";
   const TOAST_ROOT_ID = "the-list-toast-root";
   const TOAST_HIDE_DELAY_MS = 4200;
@@ -701,11 +702,108 @@
     host.dataset.recipeVerifiedBound = "1";
   };
 
+  const bindInfiniteIconLoad = () => {
+    const root = ensureRoot();
+    if (!root) return;
+    const host = q(root, `#${CARDS_HOST_ID}`) || document.getElementById(CARDS_HOST_ID);
+    if (!(host instanceof HTMLElement) || host.dataset.recipeIconLoadBound === "1") return;
+
+    let loading = false;
+    let loadingResetTimer = 0;
+    let frameScheduled = false;
+    let lastRequestedRenderedCount = -1;
+    let lastSeenRenderedCount = -1;
+
+    const parseIntSafe = (value, fallback = 0) => {
+      const parsed = Number.parseInt(String(value ?? ""), 10);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    };
+
+    const resetLoading = () => {
+      loading = false;
+      lastRequestedRenderedCount = -1;
+      if (loadingResetTimer) {
+        window.clearTimeout(loadingResetTimer);
+        loadingResetTimer = 0;
+      }
+    };
+
+    const getLoadMoreTrigger = () => {
+      const nextRoot = ensureRoot();
+      if (!nextRoot) return null;
+      return q(nextRoot, `#${ICON_LOAD_MORE_TRIGGER_ID}`) || document.getElementById(ICON_LOAD_MORE_TRIGGER_ID);
+    };
+
+    const maybeLoadMore = () => {
+      const iconGrid = host.querySelector(".people-grid[data-view-mode='icon']");
+      const sentinel = host.querySelector("[data-recipes-icon-sentinel='1']");
+      if (!(iconGrid instanceof HTMLElement) || !(sentinel instanceof HTMLElement)) {
+        resetLoading();
+        return;
+      }
+
+      const renderedCount = parseIntSafe(sentinel.getAttribute("data-rendered-count"), 0);
+      const totalCount = parseIntSafe(sentinel.getAttribute("data-total-count"), 0);
+      if (renderedCount > lastSeenRenderedCount) {
+        lastSeenRenderedCount = renderedCount;
+        if (loading && renderedCount > lastRequestedRenderedCount) {
+          loading = false;
+          if (loadingResetTimer) {
+            window.clearTimeout(loadingResetTimer);
+            loadingResetTimer = 0;
+          }
+        }
+      }
+      if (totalCount > 0 && renderedCount >= totalCount) {
+        resetLoading();
+        return;
+      }
+      if (loading && lastRequestedRenderedCount === renderedCount) return;
+
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+      const rect = sentinel.getBoundingClientRect();
+      if (rect.top > viewportHeight + 420) return;
+
+      const trigger = getLoadMoreTrigger();
+      if (!(trigger instanceof HTMLElement)) return;
+      loading = true;
+      lastRequestedRenderedCount = renderedCount;
+      trigger.click();
+      loadingResetTimer = window.setTimeout(() => {
+        // Retry only if the DOM did not advance to a new rendered count.
+        if (lastSeenRenderedCount <= lastRequestedRenderedCount) {
+          loading = false;
+        }
+      }, 15000);
+    };
+
+    const scheduleMaybeLoadMore = () => {
+      if (frameScheduled) return;
+      frameScheduled = true;
+      window.requestAnimationFrame(() => {
+        frameScheduled = false;
+        maybeLoadMore();
+      });
+    };
+
+    window.addEventListener("scroll", scheduleMaybeLoadMore, { passive: true });
+    window.addEventListener("resize", scheduleMaybeLoadMore, { passive: true });
+
+    const observer = new MutationObserver(() => {
+      scheduleMaybeLoadMore();
+    });
+    observer.observe(host, { childList: true, subtree: true });
+
+    host.dataset.recipeIconLoadBound = "1";
+    scheduleMaybeLoadMore();
+  };
+
   const bootstrap = () => {
     maybeShowCreatedRecipeToast();
     DROPDOWN_CONFIGS.forEach((config) => bindDropdown(config));
     bindCreateTrigger();
     bindVerifiedToggle();
+    bindInfiniteIconLoad();
   };
 
   if (document.readyState === "loading") {

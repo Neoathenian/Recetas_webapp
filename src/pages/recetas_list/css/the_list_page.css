@@ -638,6 +638,20 @@ button#people-view-list-toggle:focus-visible {
   background: #f8f9fa;
 }
 
+.recipe-icon-load-sentinel {
+  margin: 0.35rem auto 0.75rem;
+  width: fit-content;
+  max-width: min(100%, 36rem);
+  border: 1px dashed #bfd0c2;
+  border-radius: 999px;
+  padding: 0.45rem 0.8rem;
+  background: #eef8f1;
+  color: #2f5b46;
+  font-size: 0.78rem;
+  line-height: 1.2;
+  text-align: center;
+}
+
 #the-list-toast-root {
   position: fixed;
   top: 1rem;

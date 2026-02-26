@@ -1,6 +1,7 @@
 # ---- Resolve & inject ALL secrets BEFORE importing modules that read env ----
 from src.secrets import get_secret
 
+import asyncio
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, RedirectResponse, Response
 from starlette.staticfiles import StaticFiles
@@ -252,7 +253,7 @@ async def media_blob(blob_path: str, request: Request) -> Response:
     if version_token:
         guessed_type = mimetypes.guess_type(normalized)[0]
         try:
-            payload = download_bytes(normalized)
+            payload = await asyncio.to_thread(download_bytes, normalized)
         except FileNotFoundError:
             raise HTTPException(status_code=404)
         except Exception:
@@ -264,7 +265,7 @@ async def media_blob(blob_path: str, request: Request) -> Response:
         )
 
     try:
-        content_type, blob_etag, blob_updated_at = blob_http_metadata(normalized)
+        content_type, blob_etag, blob_updated_at = await asyncio.to_thread(blob_http_metadata, normalized)
     except FileNotFoundError:
         raise HTTPException(status_code=404)
     except Exception:
@@ -284,7 +285,7 @@ async def media_blob(blob_path: str, request: Request) -> Response:
         return Response(status_code=304, headers=headers)
 
     try:
-        payload = download_bytes(normalized)
+        payload = await asyncio.to_thread(download_bytes, normalized)
     except FileNotFoundError:
         raise HTTPException(status_code=404)
     except Exception:
