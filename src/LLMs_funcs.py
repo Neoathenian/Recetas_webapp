@@ -239,6 +239,7 @@ models=[
 default_model = models[0]
 fallback_models = models[1:]
 model_retry_attempts = 2
+default_file_ocr_model = "gemini-2.5-flash-lite"
 
 
 class _LLMTimeoutError(TimeoutError):
@@ -651,7 +652,7 @@ def recipe_file_to_webapp_json(
     mime_type: str,
     *,
     context_text: str = "",
-    model=default_model,
+    model=default_file_ocr_model,
     force_english: bool = False,
     default_card_color: str = "rgb(118, 161, 146)",
 ) -> dict:

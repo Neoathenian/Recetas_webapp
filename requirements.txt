@@ -157,8 +157,7 @@ uvicorn==0.34.0
 websockets==14.2
     # via gradio-client
 
-google-auth==2.40.3
-google-cloud==0.34.0
+google-auth==2.47.0
 google-cloud-core==2.4.3
 google-cloud-secret-manager==2.24.0
 google-cloud-storage==3.3.1
