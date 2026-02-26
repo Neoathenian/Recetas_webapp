@@ -179,7 +179,10 @@ def _render_cards(recipes: Sequence[Dict[str, object]], view_mode: object = VIEW
         media_markup = "<div class='recipe-card__swatch' aria-hidden='true'></div>"
         if card_image_src:
             image_wrap_class += " person-card__image-wrap--has-image"
-            media_markup = f"<img class='recipe-card__image' src='{card_image_src}' alt='{name}' loading='lazy'/>"
+            media_markup = (
+                f"<img class='recipe-card__image' src='{card_image_src}' alt='{name}' "
+                "loading='lazy' decoding='async' fetchpriority='low'/>"
+            )
 
         cards.append(
             f"""

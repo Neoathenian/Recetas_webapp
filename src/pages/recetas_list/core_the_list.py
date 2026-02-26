@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import html
 import io
 import json
@@ -288,7 +289,9 @@ def _recipe_from_payload(payload: Dict[str, object], slug_hint: str = "") -> Dic
         "total_time": total_time,
         "persons": persons,
         "card_image": DEFAULT_CARD_COLOR,
-        "card_image_file": str(payload.get("card image file") or payload.get("card_image_file") or "").strip(),
+        "card_image_file": _versioned_recipe_media_url(
+            payload.get("card image file") or payload.get("card_image_file")
+        ),
         "tags": _parse_list(payload.get("Tags") or payload.get("tags")),
         "tools": _parse_list(payload.get("Tools") or payload.get("tools")),
         "verified": _as_bool(payload.get("Verified") if "Verified" in payload else payload.get("verified")),
@@ -299,13 +302,31 @@ def _normalize_recipe_image_bucket_path(value: object) -> str:
     raw_value = str(value or "").strip()
     if not raw_value:
         return ""
-    if raw_value.startswith("/media/"):
-        return unquote(raw_value[len("/media/") :].lstrip("/"))
-    if raw_value.startswith("media/"):
-        return unquote(raw_value[len("media/") :].lstrip("/"))
     if raw_value.startswith("http://") or raw_value.startswith("https://") or raw_value.startswith("data:"):
         return ""
-    return raw_value.lstrip("/")
+    raw_path = raw_value.split("#", 1)[0].split("?", 1)[0]
+    if raw_path.startswith("/media/"):
+        return unquote(raw_path[len("/media/") :].lstrip("/"))
+    if raw_path.startswith("media/"):
+        return unquote(raw_path[len("media/") :].lstrip("/"))
+    return raw_path.lstrip("/")
+
+
+def _versioned_recipe_media_url(value: object) -> str:
+    raw_value = str(value or "").strip()
+    if not raw_value:
+        return ""
+    if not raw_value.startswith("/media/"):
+        return raw_value
+    if re.search(r"(?:^|[?&])v=", raw_value, flags=re.IGNORECASE):
+        return raw_value
+
+    blob_name = _normalize_recipe_image_bucket_path(raw_value)
+    if not blob_name:
+        return raw_value
+    version_token = hashlib.blake2s(blob_name.encode("utf-8"), digest_size=6).hexdigest()
+    separator = "&" if "?" in raw_value else "?"
+    return f"{raw_value}{separator}v={version_token}"
 
 
 def _recipe_index_record_from_recipe(recipe: Dict[str, object]) -> Dict[str, str]:
@@ -342,7 +363,7 @@ def _recipe_from_index_record(record: Dict[str, str]) -> Dict[str, object] | Non
         "total_time": "No especificado",
         "persons": "No especificado",
         "card_image": DEFAULT_CARD_COLOR,
-        "card_image_file": media_path(image_blob_name) if image_blob_name else "",
+        "card_image_file": _versioned_recipe_media_url(media_path(image_blob_name)) if image_blob_name else "",
         "tags": _parse_list(record.get("tags")),
         "tools": _parse_list(record.get("tags_tools") or record.get("tools")),
         "verified": _as_bool(record.get("Verified") if "Verified" in record else record.get("verified")),
@@ -760,7 +781,7 @@ def _render_recipe_hero(recipe: Dict[str, object]) -> str:
     persons = html.escape(str(recipe.get("persons") or "No especificado"))
     tags_markup = _render_tag_chips(recipe.get("tags", []), empty_label="sin-etiquetas")
     tools_markup = _render_tag_chips(recipe.get("tools", []), empty_label="sin-herramientas")
-    image_route = str(recipe.get("card_image_file") or "").strip()
+    image_route = _versioned_recipe_media_url(recipe.get("card_image_file"))
     image_src = html.escape(image_route or TRANSPARENT_PIXEL_DATA_URL, quote=True)
     image_class = "recipe-card-color__image"
     media_classes = "person-detail-card__media recipe-card-color"
@@ -789,7 +810,7 @@ def _render_recipe_hero(recipe: Dict[str, object]) -> str:
       {verified_badge}
       <div class="{media_classes}" style="--recipe-card-color: {card_color};">
         {swatch_markup}
-        <img class="{image_class}" src="{image_src}" alt="{name}" loading="lazy"/>
+        <img class="{image_class}" src="{image_src}" alt="{name}" loading="lazy" decoding="async"/>
       </div>
       <div class="person-detail-card__body">
         <h2 class="person-detail-card__title">{name}</h2>

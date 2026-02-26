@@ -3289,6 +3289,19 @@
   const getRecipeStepItems = (list) =>
     list instanceof HTMLElement ? Array.from(list.querySelectorAll(RECIPE_STEP_ITEM_SELECTOR)) : [];
 
+  const getRecipeStepInputControl = (item) => {
+    if (!(item instanceof HTMLElement)) return null;
+    const input = item.querySelector(".recipe-step-item__input");
+    if (input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement) return input;
+    return null;
+  };
+
+  const resizeRecipeStepInputControl = (input) => {
+    if (!(input instanceof HTMLTextAreaElement)) return;
+    input.style.height = "auto";
+    input.style.height = `${Math.max(input.scrollHeight, 32)}px`;
+  };
+
   const updateRecipeStepIndices = (list) => {
     getRecipeStepItems(list).forEach((item, index) => {
       const indexNode = item.querySelector(".recipe-step-item__index");
@@ -3299,8 +3312,8 @@
 
   const collectRecipeStepValuesFromList = (list) =>
     getRecipeStepItems(list).map((item) => {
-      const input = item.querySelector(".recipe-step-item__input");
-      if (!(input instanceof HTMLInputElement)) return "";
+      const input = getRecipeStepInputControl(item);
+      if (!(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement)) return "";
       return normalizeRecipeStepValue(input.value);
     });
 
@@ -3357,9 +3370,9 @@
     indexNode.className = "recipe-step-item__index";
     indexNode.textContent = "1";
 
-    const input = document.createElement("input");
-    input.type = "text";
+    const input = document.createElement("textarea");
     input.className = "recipe-step-item__input";
+    input.rows = 1;
     input.value = normalizeRecipeStepValue(initialValue);
     input.placeholder = "Describe este paso...";
     input.setAttribute("aria-label", "Paso de preparación");
@@ -3377,11 +3390,13 @@
     item.appendChild(removeButton);
 
     input.addEventListener("input", () => {
+      resizeRecipeStepInputControl(input);
       syncRecipeStepsTextareaFromList(host, textarea, list);
     });
     input.addEventListener("blur", () => {
       const cleaned = normalizeRecipeStepValue(input.value);
       if (cleaned !== input.value) input.value = cleaned;
+      resizeRecipeStepInputControl(input);
       syncRecipeStepsTextareaFromList(host, textarea, list);
     });
 
@@ -3423,6 +3438,10 @@
       syncRecipeStepsTextareaFromList(host, textarea, list);
     });
 
+    window.requestAnimationFrame(() => {
+      resizeRecipeStepInputControl(input);
+    });
+
     return item;
   };
 
@@ -3434,7 +3453,7 @@
     syncRecipeStepsTextareaFromList(host, textarea, list);
     if (focus) {
       const input = item.querySelector(".recipe-step-item__input");
-      if (input instanceof HTMLInputElement) {
+      if (input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement) {
         window.setTimeout(() => input.focus(), 0);
       }
     }
@@ -3497,6 +3516,7 @@
     if (!(host instanceof HTMLElement)) return;
     const textarea = getRecipeStepsTextarea(host);
     if (!(textarea instanceof HTMLTextAreaElement)) return;
+    textarea.classList.add("recipe-steps-editor__source");
 
     let editor = getRecipeStepsEditor(host);
     if (!(editor instanceof HTMLElement)) {

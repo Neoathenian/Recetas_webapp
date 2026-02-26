@@ -618,6 +618,9 @@ def recipe_text_to_webapp_json(
         Rules:
         - "Ingredients" must be a JSON object mapping ingredient name -> amount.
         - "Steps", "Tags", and "Tools" must be JSON arrays of strings.
+        - Preserve the source step structure exactly: keep the same step order and the same number of steps found in the recipe.
+        - For "Steps", transcribe the original step text as literally as possible from the source. Do not summarize, merge, split, rewrite, or paraphrase steps.
+        - Keep quantities, times, temperatures, and wording in each step exactly as shown whenever readable.
         - If data is missing, use "No especificado" for time/servings, [] for lists, and {{}} for ingredients.
         - Keep names and ingredient wording concise.
         - Do not invent unsafe cooking instructions.
@@ -679,6 +682,9 @@ def recipe_file_to_webapp_json(
         Rules:
         - "Ingredients" must be a JSON object mapping ingredient name -> amount.
         - "Steps", "Tags", and "Tools" must be JSON arrays of strings.
+        - Preserve the source step structure exactly: keep the same step order and the same number of steps found in the recipe.
+        - For "Steps", transcribe the original step text as literally as possible from the file/OCR. Do not summarize, merge, split, rewrite, or paraphrase steps.
+        - Keep quantities, times, temperatures, and wording in each step exactly as shown whenever readable.
         - If data is missing, use "No especificado" for time/servings, [] for lists, and {{}} for ingredients.
         - Keep names and ingredient wording concise.
         - Do not invent unsafe cooking instructions.

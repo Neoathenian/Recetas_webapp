@@ -25,7 +25,10 @@ from src.local_user_roles import report_and_disable_user
 from src.login_logic import get_user
 from src.page_timing import timed_page_load
 from src.pages.header import render_header, with_light_mode_head
-from src.pages.recetas_display.core_people import _render_article_markdown as _render_citation_compiled_markdown
+from src.pages.recetas_display.core_people import (
+    _optimize_uploaded_image_bytes,
+    _render_article_markdown as _render_citation_compiled_markdown,
+)
 from src.people_proposal_diffs import ensure_people_diff_tables, upsert_people_diff_payload
 from src.people_taxonomy import (
     ensure_people_cards_refs,
@@ -3318,6 +3321,7 @@ def _persist_uploaded_image(upload_path: str, slug: str, actor_email: str) -> st
     image_bytes = source.read_bytes()
     if len(image_bytes) > MAX_IMAGE_BYTES:
         raise ValueError(f"La imagen supera el límite de {MAX_IMAGE_BYTES // (1024 * 1024)} MB.")
+    image_bytes, extension = _optimize_uploaded_image_bytes(image_bytes, extension)
 
     email_slug = _slugify((actor_email or "anon").split("@", 1)[0])
     filename = f"{email_slug}-{uuid4().hex[:10]}{extension}"

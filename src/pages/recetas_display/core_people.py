@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import binascii
 import html
+import io
 import json
 import logging
 import os
@@ -15,6 +16,7 @@ from uuid import uuid4
 
 import gradio as gr
 from sqlalchemy import text
+from PIL import Image, ImageOps
 
 from src.db import readonly_session_scope, session_scope
 from src.gcs_storage import media_path, upload_bytes
@@ -32,6 +34,7 @@ from src.people_taxonomy import (
 logger = logging.getLogger(__name__)
 
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
+CARD_IMAGE_SIZE = (360, 270)
 ALLOWED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"}
 ALLOWED_IMAGE_MIME_TYPES = {
     "image/png": ".png",
@@ -132,6 +135,42 @@ _DUMMY_PEOPLE: Sequence[Tuple[str, str, Tuple[str, ...]]] = (
     ("Yasin Clarke", "Forward", ("right-wing", "acceleration", "decision-making")),
     ("Zane Brooks", "Goalkeeper", ("command", "communication", "distribution")),
 )
+
+
+def _optimize_uploaded_image_bytes(image_bytes: bytes, extension: str) -> tuple[bytes, str]:
+    ext = str(extension or "").lower()
+    if ext in {".svg", ".gif"}:
+        return image_bytes, ext
+
+    try:
+        with Image.open(io.BytesIO(image_bytes)) as img:
+            img = ImageOps.exif_transpose(img)
+            resampling = getattr(Image, "Resampling", Image).LANCZOS
+            # Normalize uploaded card images to the app's canonical card size.
+            img = ImageOps.fit(img, CARD_IMAGE_SIZE, method=resampling)
+
+            out = io.BytesIO()
+            if ext in {".jpg", ".jpeg"}:
+                if img.mode not in ("RGB", "L"):
+                    img = img.convert("RGB")
+                img.save(out, format="JPEG", optimize=True, quality=82, progressive=True)
+                return out.getvalue(), ".jpg"
+
+            if ext == ".png":
+                if img.mode not in ("RGB", "RGBA", "L", "LA", "P"):
+                    img = img.convert("RGBA")
+                img.save(out, format="PNG", optimize=True)
+                return out.getvalue(), ".png"
+
+            if ext == ".webp":
+                if img.mode not in ("RGB", "RGBA", "L", "LA"):
+                    img = img.convert("RGBA")
+                img.save(out, format="WEBP", quality=80, method=6)
+                return out.getvalue(), ".webp"
+    except Exception:
+        logger.exception("Image optimization failed; uploading original bytes")
+
+    return image_bytes, ext
 
 
 def _is_truthy(value: object) -> bool:
@@ -1805,6 +1844,7 @@ def _persist_uploaded_image(upload_path: str, slug: str, actor_email: str) -> st
     image_bytes = source.read_bytes()
     if len(image_bytes) > MAX_IMAGE_BYTES:
         raise ValueError(f"Image exceeds {MAX_IMAGE_BYTES // (1024 * 1024)} MB limit.")
+    image_bytes, extension = _optimize_uploaded_image_bytes(image_bytes, extension)
 
     email_slug = _slugify((actor_email or "anon").split("@", 1)[0])
     filename = f"{email_slug}-{uuid4().hex[:10]}{extension}"
@@ -1843,6 +1883,7 @@ def _persist_uploaded_image_data_url(image_data_url: str, slug: str, actor_email
         raise ValueError("Cropped image payload is empty.")
     if len(image_bytes) > MAX_IMAGE_BYTES:
         raise ValueError(f"Image exceeds {MAX_IMAGE_BYTES // (1024 * 1024)} MB limit.")
+    image_bytes, extension = _optimize_uploaded_image_bytes(image_bytes, extension)
 
     email_slug = _slugify((actor_email or "anon").split("@", 1)[0])
     filename = f"{email_slug}-{uuid4().hex[:10]}{extension}"

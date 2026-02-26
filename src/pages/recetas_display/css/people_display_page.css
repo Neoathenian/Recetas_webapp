@@ -245,6 +245,13 @@ button#recipe-import-modal-close-btn:focus-visible {
   box-shadow: none !important;
 }
 
+#recipe-import-group .styler,
+#recipe-import-group .form {
+  background: #ffffff !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
 #recipe-import-row {
   gap: 0.7rem;
   align-items: center;
@@ -1275,7 +1282,7 @@ button#recipe-import-submit-btn:focus-visible {
   background: #bfdbfe;
 }
 
-#recipe-editor-steps-input.recipe-steps-input--enhanced textarea {
+#recipe-editor-steps-input.recipe-steps-input--enhanced textarea.recipe-steps-editor__source {
   display: none !important;
 }
 
@@ -1340,7 +1347,7 @@ button#recipe-import-submit-btn:focus-visible {
 #recipe-editor-steps-input .recipe-step-item {
   display: grid;
   grid-template-columns: 1.35rem 1.2rem minmax(0, 1fr) 1.28rem;
-  align-items: center;
+  align-items: start;
   gap: 0.38rem;
   border: 1px solid #d5dbe0;
   border-radius: 10px;
@@ -1368,6 +1375,7 @@ button#recipe-import-submit-btn:focus-visible {
   padding: 0;
   width: 1.35rem;
   height: 1.35rem;
+  align-self: start;
   border-radius: 8px;
   cursor: grab;
 }
@@ -1387,17 +1395,24 @@ button#recipe-import-submit-btn:focus-visible {
   font-weight: 700;
   color: #0f766e;
   text-align: center;
+  align-self: start;
+  padding-top: 0.35rem;
 }
 
 #recipe-editor-steps-input .recipe-step-item__input {
+  display: block;
   width: 100%;
-  height: 2rem;
+  min-height: 2rem;
   border-radius: 8px;
   border: 1px solid #c6d0db;
   background: #ffffff;
   color: #1f2933;
   font-size: 0.95rem;
-  padding: 0 0.52rem;
+  line-height: 1.28;
+  font-family: inherit;
+  padding: 0.33rem 0.52rem;
+  resize: vertical;
+  overflow-y: hidden;
 }
 
 #recipe-editor-steps-input .recipe-step-item__input:focus {
@@ -1413,6 +1428,8 @@ button#recipe-import-submit-btn:focus-visible {
   width: 1.25rem;
   height: 1.25rem;
   min-width: 1.25rem;
+  align-self: start;
+  margin-top: 0.2rem;
   padding: 0;
   display: inline-flex;
   align-items: center;
