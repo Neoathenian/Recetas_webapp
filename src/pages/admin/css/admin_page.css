@@ -43,11 +43,125 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  overflow: visible !important;
 }
 
 #admin-upload-area .gradio-button {
   width: auto;
   white-space: nowrap;
+}
+
+#admin-recipes-download-menu {
+  position: relative;
+  margin-top: 0 !important;
+  align-self: flex-start !important;
+  flex: 0 0 auto !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+  z-index: 140;
+  isolation: isolate;
+}
+
+#admin-recipes-download-menu > .wrap,
+#admin-recipes-download-menu .gr-block,
+#admin-recipes-download-menu .gradio-column,
+#admin-recipes-download-menu .gradio-row,
+#admin-recipes-download-menu [class*="wrap"],
+#admin-recipes-download-menu [class*="container"] {
+  overflow: visible !important;
+}
+
+#admin-recipes-download-menu-btn {
+  margin: 0 !important;
+}
+
+#admin-recipes-download-menu-btn button,
+button#admin-recipes-download-menu-btn {
+  min-width: 38px !important;
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 999px !important;
+  padding: 0 !important;
+  border: 1px solid #bfd5f6 !important;
+  background-color: #ffffff !important;
+  background-image: url("/images/download-button.svg");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 18px 18px;
+  color: transparent !important;
+  font-size: 0 !important;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+}
+
+#admin-recipes-download-menu-btn button:hover,
+#admin-recipes-download-menu-btn button:focus-visible,
+button#admin-recipes-download-menu-btn:hover,
+button#admin-recipes-download-menu-btn:focus-visible {
+  background-color: #eff6ff !important;
+  border-color: #93c5fd !important;
+}
+
+#admin-recipes-download-options {
+  position: absolute;
+  top: calc(100% + 0.12rem);
+  right: 0;
+  left: auto !important;
+  display: none !important;
+  min-width: 118px;
+  width: max-content;
+  padding: 0.3rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 11px;
+  background: #ffffff;
+  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.18);
+  z-index: 260;
+}
+
+#admin-recipes-download-options .gradio-button,
+#admin-recipes-download-options #admin-recipes-download-json-btn,
+#admin-recipes-download-options #admin-recipes-download-html-btn,
+#admin-recipes-download-options #admin-recipes-download-pdf-btn {
+  margin: 0 !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+#admin-recipes-download-options button {
+  min-height: 34px !important;
+  width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  white-space: nowrap !important;
+  padding: 0 0.72rem !important;
+  border-radius: 8px !important;
+  border: 1px solid transparent !important;
+  background: #ffffff !important;
+  color: #1f2933 !important;
+  box-shadow: none !important;
+  font-size: 0.84rem !important;
+  font-weight: 700 !important;
+}
+
+#admin-recipes-download-options button::before,
+#admin-recipes-download-options button::after,
+#admin-recipes-download-options [role="progressbar"],
+#admin-recipes-download-options .progress-bar,
+#admin-recipes-download-options .pending,
+#admin-recipes-download-options .spinner {
+  display: none !important;
+}
+
+#admin-recipes-download-options button:hover,
+#admin-recipes-download-options button:focus-visible {
+  background: #eff6ff !important;
+  border-color: #bfdbfe !important;
+}
+
+#admin-recipes-download-menu:hover #admin-recipes-download-options,
+#admin-recipes-download-menu:focus-within #admin-recipes-download-options {
+  display: grid !important;
+  gap: 0.15rem;
 }
 
 #admin-editor-df button[aria-label*="menu" i],

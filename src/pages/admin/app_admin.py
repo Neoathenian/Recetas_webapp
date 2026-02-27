@@ -12,6 +12,11 @@ from src.pages.admin.common import (
     load_table_view,
     table_info_to_json,
 )
+from src.pages.admin.download_all_recipes import (
+    handle_download_all_recipes_html_zip,
+    handle_download_all_recipes_json_zip,
+    handle_download_all_recipes_pdf_zip,
+)
 from src.pages.admin.delete_row import delete_row as delete_row_handler
 from src.pages.admin.download_all_tables import handle_download_all_tables
 from src.pages.admin.edit_row import load_row_for_edit, save_row, save_inline_row
@@ -150,6 +155,30 @@ def make_admin_app() -> gr.Blocks:
                     variant="secondary",
                     elem_id="admin-download-all-button",
                 )
+                with gr.Column(
+                    elem_id="admin-recipes-download-menu",
+                ):
+                    gr.Button(
+                        " ",
+                        variant="secondary",
+                        elem_id="admin-recipes-download-menu-btn",
+                    )
+                    with gr.Column(elem_id="admin-recipes-download-options"):
+                        download_recipes_json_zip_btn = gr.DownloadButton(
+                            "JSON",
+                            variant="secondary",
+                            elem_id="admin-recipes-download-json-btn",
+                        )
+                        download_recipes_html_zip_btn = gr.DownloadButton(
+                            "HTML",
+                            variant="secondary",
+                            elem_id="admin-recipes-download-html-btn",
+                        )
+                        download_recipes_pdf_zip_btn = gr.DownloadButton(
+                            "PDF",
+                            variant="secondary",
+                            elem_id="admin-recipes-download-pdf-btn",
+                        )
             with gr.Column(elem_id="admin-editor-area"):
                 save_row_btn = gr.Button(
                     "Guardar fila", variant="primary", visible=False
@@ -269,9 +298,44 @@ def make_admin_app() -> gr.Blocks:
         )
 
         download_all_btn.click(
+            lambda: gr.update(value="⏳ Preparando ZIP de tablas...", visible=True),
+            inputs=None,
+            outputs=[status],
+            queue=False,
+        ).then(
             handle_download_all_tables,
             inputs=None,
             outputs=[download_all_btn, status],
+        )
+        download_recipes_json_zip_btn.click(
+            lambda: gr.update(value="⏳ Preparando ZIP JSON de recetas...", visible=True),
+            inputs=None,
+            outputs=[status],
+            queue=False,
+        ).then(
+            handle_download_all_recipes_json_zip,
+            inputs=None,
+            outputs=[download_recipes_json_zip_btn, status],
+        )
+        download_recipes_html_zip_btn.click(
+            lambda: gr.update(value="⏳ Preparando ZIP HTML de recetas...", visible=True),
+            inputs=None,
+            outputs=[status],
+            queue=False,
+        ).then(
+            handle_download_all_recipes_html_zip,
+            inputs=None,
+            outputs=[download_recipes_html_zip_btn, status],
+        )
+        download_recipes_pdf_zip_btn.click(
+            lambda: gr.update(value="⏳ Preparando ZIP PDF de recetas...", visible=True),
+            inputs=None,
+            outputs=[status],
+            queue=False,
+        ).then(
+            handle_download_all_recipes_pdf_zip,
+            inputs=None,
+            outputs=[download_recipes_pdf_zip_btn, status],
         )
 
         add_row_btn.click(

@@ -71,6 +71,11 @@ from src.pages.ui_login import make_login_page
 from src.mount_gradio_app import mount_gradio_app
 from src.pages.recetas_list.app_the_list import make_the_list_app
 from src.pages.recetas_display.app_people_display import make_people_display_app
+from src.pages.admin.download_all_recipes import (
+    handle_download_all_recipes_html_zip,
+    handle_download_all_recipes_json_zip,
+    handle_download_all_recipes_pdf_zip,
+)
 from src.pages.privileges.app_privileges import make_privileges_app
 from src.pages.profile.app_profile import make_profile_app
 
@@ -96,6 +101,184 @@ def _make_bucket_notice_app(path: str, title: str, heading: str, message: str) -
         with gr.Column():
             gr.Markdown(f"## {heading}")
             gr.Markdown(message)
+    return app_notice
+
+
+def _make_bucket_admin_notice_app(path: str, title: str, heading: str, message: str) -> gr.Blocks:
+    from src.pages.header import render_header
+
+    css = """
+    #bucket-admin-notice-shell {
+      max-width: 980px;
+      margin: 0 auto;
+      gap: 1rem;
+    }
+    #bucket-admin-recipes-download-menu {
+      position: relative;
+      margin-top: 0 !important;
+      align-self: flex-start !important;
+      flex: 0 0 auto !important;
+      min-width: 0 !important;
+      overflow: visible !important;
+      z-index: 160;
+      isolation: isolate;
+    }
+    #bucket-admin-recipes-download-menu > .wrap,
+    #bucket-admin-recipes-download-menu .gr-block,
+    #bucket-admin-recipes-download-menu .gradio-column,
+    #bucket-admin-recipes-download-menu .gradio-row,
+    #bucket-admin-recipes-download-menu [class*="wrap"],
+    #bucket-admin-recipes-download-menu [class*="container"] {
+      overflow: visible !important;
+    }
+    #bucket-admin-recipes-download-menu-btn button,
+    button#bucket-admin-recipes-download-menu-btn {
+      min-width: 38px !important;
+      width: 38px !important;
+      height: 38px !important;
+      border-radius: 999px !important;
+      padding: 0 !important;
+      border: 1px solid #bfd5f6 !important;
+      background-color: #ffffff !important;
+      background-image: url("/images/download-button.svg");
+      background-position: center;
+      background-repeat: no-repeat;
+      background-size: 18px 18px;
+      color: transparent !important;
+      font-size: 0 !important;
+      box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+    }
+    #bucket-admin-recipes-download-menu-btn button:hover,
+    #bucket-admin-recipes-download-menu-btn button:focus-visible,
+    button#bucket-admin-recipes-download-menu-btn:hover,
+    button#bucket-admin-recipes-download-menu-btn:focus-visible {
+      background-color: #eff6ff !important;
+      border-color: #93c5fd !important;
+    }
+    #bucket-admin-recipes-download-options {
+      position: absolute;
+      top: calc(100% + 0.12rem);
+      left: 0;
+      display: none !important;
+      min-width: 118px;
+      width: max-content;
+      padding: 0.3rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 11px;
+      background: #ffffff;
+      box-shadow: 0 16px 30px rgba(15, 23, 42, 0.18);
+      z-index: 260;
+    }
+    #bucket-admin-recipes-download-options .gradio-button,
+    #bucket-admin-recipes-download-options #bucket-admin-recipes-download-json-btn,
+    #bucket-admin-recipes-download-options #bucket-admin-recipes-download-html-btn,
+    #bucket-admin-recipes-download-options #bucket-admin-recipes-download-pdf-btn {
+      margin: 0 !important;
+      width: 100% !important;
+      min-width: 0 !important;
+    }
+    #bucket-admin-recipes-download-options button {
+      min-height: 34px !important;
+      width: 100% !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: flex-start !important;
+      white-space: nowrap !important;
+      padding: 0 0.72rem !important;
+      border-radius: 8px !important;
+      border: 1px solid transparent !important;
+      background: #ffffff !important;
+      color: #1f2933 !important;
+      box-shadow: none !important;
+      font-size: 0.84rem !important;
+      font-weight: 700 !important;
+    }
+    #bucket-admin-recipes-download-options button::before,
+    #bucket-admin-recipes-download-options button::after,
+    #bucket-admin-recipes-download-options [role="progressbar"],
+    #bucket-admin-recipes-download-options .progress-bar,
+    #bucket-admin-recipes-download-options .pending,
+    #bucket-admin-recipes-download-options .spinner {
+      display: none !important;
+    }
+    #bucket-admin-recipes-download-options button:hover,
+    #bucket-admin-recipes-download-options button:focus-visible {
+      background: #eff6ff !important;
+      border-color: #bfdbfe !important;
+    }
+    #bucket-admin-recipes-download-menu:hover #bucket-admin-recipes-download-options,
+    #bucket-admin-recipes-download-menu:focus-within #bucket-admin-recipes-download-options {
+      display: grid !important;
+      gap: 0.15rem;
+    }
+    """
+
+    with gr.Blocks(title=title, css=css) as app_notice:
+        hdr = gr.HTML()
+
+        def _render_notice_header(request: gr.Request):
+            return render_header(path=path, request=request)
+
+        app_notice.load(_render_notice_header, outputs=[hdr])
+        with gr.Column(elem_id="bucket-admin-notice-shell"):
+            gr.Markdown(f"## {heading}")
+            gr.Markdown(message)
+            gr.Markdown("### Descargar todas las recetas")
+            with gr.Column(elem_id="bucket-admin-recipes-download-menu"):
+                gr.Button(
+                    " ",
+                    variant="secondary",
+                    elem_id="bucket-admin-recipes-download-menu-btn",
+                )
+                with gr.Column(elem_id="bucket-admin-recipes-download-options"):
+                    download_json_zip_btn = gr.DownloadButton(
+                        "JSON",
+                        variant="secondary",
+                        elem_id="bucket-admin-recipes-download-json-btn",
+                    )
+                    download_html_zip_btn = gr.DownloadButton(
+                        "HTML",
+                        variant="secondary",
+                        elem_id="bucket-admin-recipes-download-html-btn",
+                    )
+                    download_pdf_zip_btn = gr.DownloadButton(
+                        "PDF",
+                        variant="secondary",
+                        elem_id="bucket-admin-recipes-download-pdf-btn",
+                    )
+            status = gr.Markdown(value="", visible=True)
+
+        download_json_zip_btn.click(
+            lambda: gr.update(value="⏳ Preparando ZIP JSON de recetas...", visible=True),
+            inputs=None,
+            outputs=[status],
+            queue=False,
+        ).then(
+            handle_download_all_recipes_json_zip,
+            inputs=None,
+            outputs=[download_json_zip_btn, status],
+        )
+        download_html_zip_btn.click(
+            lambda: gr.update(value="⏳ Preparando ZIP HTML de recetas...", visible=True),
+            inputs=None,
+            outputs=[status],
+            queue=False,
+        ).then(
+            handle_download_all_recipes_html_zip,
+            inputs=None,
+            outputs=[download_html_zip_btn, status],
+        )
+        download_pdf_zip_btn.click(
+            lambda: gr.update(value="⏳ Preparando ZIP PDF de recetas...", visible=True),
+            inputs=None,
+            outputs=[status],
+            queue=False,
+        ).then(
+            handle_download_all_recipes_pdf_zip,
+            inputs=None,
+            outputs=[download_pdf_zip_btn, status],
+        )
+
     return app_notice
 
 
@@ -309,7 +492,7 @@ review_display_app = _make_bucket_notice_app(
         "El flujo de revisión SQL está deshabilitado."
     ),
 )
-admin_app = _make_bucket_notice_app(
+admin_app = _make_bucket_admin_notice_app(
     path="/admin",
     title="Administración de Recetas",
     heading="Administración SQL deshabilitada",
