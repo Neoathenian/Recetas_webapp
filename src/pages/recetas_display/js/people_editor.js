@@ -7,6 +7,7 @@
   const CARD_TITLE_ACTIONS_SLOT_ID = "person-detail-card-title-actions-slot";
   const PAGE_TITLE_ROW_ID = "people-title-row";
   const CARD_EDIT_BUTTON_ID = "the-list-card-edit-btn";
+  const DOWNLOAD_MENU_ID = "recipe-download-menu";
   const DELETE_BUTTON_ID = "the-list-delete-btn";
   const MARKDOWN_EDIT_BUTTON_ID = "the-list-markdown-edit-btn";
   const REVIEW_LINK_ID = "the-list-review-link";
@@ -18,7 +19,10 @@
   const PROPOSAL_STATUS_IDS = ["the-list-proposal-status", "the-list-card-proposal-status", "recipe-page-status"];
   const VERIFY_STATUS_PATTERN = /receta marcada como (verificada|sin verificar)/i;
   const CREATE_RECIPE_STATUS_PATTERN = /receta creada/i;
-  const RECETAS_LIST_CREATED_URL = "/recetas?created_recipe=1";
+  const DELETE_RECIPE_STATUS_PATTERN = /receta .*eliminad[ao]/i;
+  const RECETAS_LIST_CREATED_URL = "/recetas/?created_recipe=1";
+  const RECETAS_LIST_DELETED_URL = "/recetas/?deleted_recipe=1";
+  const RECETAS_LIST_TOAST_SESSION_KEY = "recetas_list_success_toast";
   const TOAST_ROOT_ID = "the-list-toast-root";
   const TOAST_HIDE_DELAY_MS = 4200;
   const TOAST_REMOVE_DELAY_MS = 4700;
@@ -53,6 +57,11 @@
   const DETAIL_VERIFY_PAYLOAD_ID = "recipe-detail-verify-payload";
   const DETAIL_VERIFY_TRIGGER_ID = "recipe-detail-verify-trigger";
   const DETAIL_VERIFY_STATE_ID = "recipe-verified-state";
+  const RECIPE_DOWNLOAD_PAYLOAD_ID = "recipe-download-payload";
+  const RECIPE_DELETE_BLOCKED_MESSAGE =
+    "No puedes eliminar una receta verificada. Primero márcala como sin verificar.";
+  const RECIPE_DELETE_CONFIRM_MESSAGE =
+    "Esta acción eliminará la receta de forma permanente y no se puede deshacer.\n\n¿Quieres continuar?";
   const RECIPE_IMPORT_FILE_LIST_ID = "recipe-import-file-list";
   const RECIPE_IMPORT_REMOVE_INDEX_ID = "recipe-import-remove-index";
   const RECIPE_IMPORT_REMOVE_TRIGGER_ID = "recipe-import-remove-trigger";
@@ -114,6 +123,7 @@
   let recipeIngredientItemCounter = 0;
   let recipeStepItemCounter = 0;
   let createdRecipeRedirectTriggered = false;
+  let deletedRecipeRedirectTriggered = false;
 
   const getCropDebugStore = () => {
     const key = "__theListCropDebugLogs";
@@ -465,6 +475,26 @@
     if ((input.value || "") === next) return;
     input.value = next;
     dispatchComponentEvents(input);
+  };
+
+  const decodeBase64ToBytes = (value) => {
+    const raw = String(value || "").replace(/\s+/g, "");
+    if (!raw) return new Uint8Array(0);
+    const binary = window.atob(raw);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+    return bytes;
+  };
+
+  const stopEvent = (event) => {
+    if (!(event instanceof Event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (typeof event.stopImmediatePropagation === "function") {
+      event.stopImmediatePropagation();
+    }
   };
 
   const isTrueish = (value) => {
@@ -2684,6 +2714,93 @@
     });
   };
 
+  const bindRecipeDeleteGuard = () => {
+    if (document.body.dataset.recipeDeleteGuardBound === "1") return;
+    document.body.dataset.recipeDeleteGuardBound = "1";
+
+    document.addEventListener(
+      "click",
+      (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const deleteTarget = target.closest(
+          `#${DELETE_BUTTON_ID}, #${DELETE_BUTTON_ID} button, button#${DELETE_BUTTON_ID}`,
+        );
+        if (!(deleteTarget instanceof HTMLElement)) return;
+
+        const deleteHost = document.getElementById(DELETE_BUTTON_ID);
+        if (
+          deleteHost instanceof HTMLElement &&
+          deleteTarget !== deleteHost &&
+          !deleteHost.contains(deleteTarget)
+        ) {
+          return;
+        }
+
+        if (isTrueish(getComponentValue(DETAIL_VERIFY_STATE_ID))) {
+          stopEvent(event);
+          window.alert(RECIPE_DELETE_BLOCKED_MESSAGE);
+          return;
+        }
+
+        const confirmed = window.confirm(RECIPE_DELETE_CONFIRM_MESSAGE);
+        if (!confirmed) {
+          stopEvent(event);
+        }
+      },
+      true,
+    );
+  };
+
+  const bindRecipeDownloadPayload = () => {
+    const host = document.getElementById(RECIPE_DOWNLOAD_PAYLOAD_ID);
+    const input = getComponentInput(RECIPE_DOWNLOAD_PAYLOAD_ID);
+    if (!(host instanceof HTMLElement) || !(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement)) {
+      return;
+    }
+    if (host.dataset.recipeDownloadPayloadBound === "1") return;
+    host.dataset.recipeDownloadPayloadBound = "1";
+
+    let lastPayload = "";
+    const consumePayload = () => {
+      const rawPayload = String(input.value || "").trim();
+      if (!rawPayload || rawPayload === lastPayload) return;
+      lastPayload = rawPayload;
+
+      try {
+        const payload = JSON.parse(rawPayload);
+        const filename = String(payload?.filename || "receta");
+        const mimeType = String(payload?.mime_type || "application/octet-stream");
+        const bytes = decodeBase64ToBytes(payload?.data_base64 || "");
+        if (!bytes.length) return;
+
+        const blob = new Blob([bytes], { type: mimeType });
+        const objectUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = objectUrl;
+        anchor.download = filename;
+        anchor.style.display = "none";
+        document.body.appendChild(anchor);
+        anchor.click();
+        window.setTimeout(() => {
+          URL.revokeObjectURL(objectUrl);
+          anchor.remove();
+        }, 0);
+      } catch (error) {
+        void error;
+      } finally {
+        setComponentValue(RECIPE_DOWNLOAD_PAYLOAD_ID, "");
+        lastPayload = "";
+      }
+    };
+
+    input.addEventListener("input", consumePayload);
+    input.addEventListener("change", consumePayload);
+    const observer = new MutationObserver(consumePayload);
+    observer.observe(input, { attributes: true, childList: true, characterData: true, subtree: true });
+    consumePayload();
+  };
+
   const bindRecipeImportFileChipRemovers = () => {
     if (document.body.dataset.recipeImportFileChipRemoversBound === "1") return;
     document.body.dataset.recipeImportFileChipRemoversBound = "1";
@@ -4739,19 +4856,29 @@
     const titleSlot = document.getElementById(CARD_TITLE_ACTIONS_SLOT_ID);
     const pageTitleRow = document.getElementById(PAGE_TITLE_ROW_ID);
     const cardEditButton = document.getElementById(CARD_EDIT_BUTTON_ID);
+    const downloadMenu = document.getElementById(DOWNLOAD_MENU_ID);
     const deleteButton = document.getElementById(DELETE_BUTTON_ID);
     const reviewLink = document.getElementById(REVIEW_LINK_ID);
     if (pageTitleRow) {
       if (cardEditButton && cardEditButton.parentElement !== pageTitleRow) {
         pageTitleRow.appendChild(cardEditButton);
       }
+      if (downloadMenu && downloadMenu.parentElement !== pageTitleRow) {
+        pageTitleRow.appendChild(downloadMenu);
+      }
+      if (deleteButton && deleteButton.parentElement !== pageTitleRow) {
+        pageTitleRow.appendChild(deleteButton);
+      }
       if (reviewLink && reviewLink.parentElement !== pageTitleRow) {
         pageTitleRow.appendChild(reviewLink);
       }
-    } else if (titleSlot && cardEditButton && cardEditButton.parentElement !== titleSlot) {
-      titleSlot.appendChild(cardEditButton);
-    }
-    if (titleSlot) {
+    } else if (titleSlot) {
+      if (cardEditButton && cardEditButton.parentElement !== titleSlot) {
+        titleSlot.appendChild(cardEditButton);
+      }
+      if (downloadMenu && downloadMenu.parentElement !== titleSlot) {
+        titleSlot.appendChild(downloadMenu);
+      }
       if (deleteButton && deleteButton.parentElement !== titleSlot) {
         titleSlot.appendChild(deleteButton);
       }
@@ -4841,7 +4968,25 @@
             clearStatusMessage(statusNode);
             if (!createdRecipeRedirectTriggered) {
               createdRecipeRedirectTriggered = true;
+              try {
+                window.sessionStorage.setItem(RECETAS_LIST_TOAST_SESSION_KEY, "created");
+              } catch (error) {
+                void error;
+              }
               window.location.assign(RECETAS_LIST_CREATED_URL);
+            }
+            return;
+          }
+          if (DELETE_RECIPE_STATUS_PATTERN.test(message)) {
+            clearStatusMessage(statusNode);
+            if (!deletedRecipeRedirectTriggered) {
+              deletedRecipeRedirectTriggered = true;
+              try {
+                window.sessionStorage.setItem(RECETAS_LIST_TOAST_SESSION_KEY, "deleted");
+              } catch (error) {
+                void error;
+              }
+              window.location.assign(RECETAS_LIST_DELETED_URL);
             }
             return;
           }
@@ -4872,6 +5017,8 @@
     bindBibliographyInsertButton();
     bindProposalStatusToasts();
     bindDetailVerifiedToggle();
+    bindRecipeDeleteGuard();
+    bindRecipeDownloadPayload();
     refreshInlineCardEditor();
     ensureRecipeIngredientsEditor();
     ensureRecipeStepsEditor();

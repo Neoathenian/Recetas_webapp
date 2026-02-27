@@ -116,10 +116,6 @@ def _patch_gradio_upload_chunk_size() -> None:
             chunk_size,
             patched_files,
         )
-    else:
-        logger.warning(
-            "Did not patch any Gradio upload asset files; upload batching may remain at Gradio defaults."
-        )
 
 def add_middleware_redirect(app, app_route: str):
     """

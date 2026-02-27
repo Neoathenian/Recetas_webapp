@@ -3,7 +3,9 @@ from __future__ import annotations
 import html
 import json
 import logging
+import re
 import time
+import unicodedata
 from pathlib import Path
 from typing import Dict, List, Sequence
 from urllib.parse import quote
@@ -47,6 +49,7 @@ VIEW_MODE_LIST = "list"
 VIEW_MODE_ICON_LABEL = "Iconos"
 VIEW_MODE_LIST_LABEL = "Lista"
 ICON_MODE_BATCH_SIZE = 40
+SEARCH_TOKEN_RE = re.compile(r"[a-z0-9]+")
 
 
 def _log_timing(event_name: str, start: float, **fields: object) -> None:
@@ -273,27 +276,71 @@ def _resolve_next_filter_selection(
     return dropdown_update, next_selection
 
 
-def _normalize_search_query(value: object) -> str:
-    return str(value or "").strip().lower()
+def _normalize_search_text(value: object) -> str:
+    raw_text = str(value or "").strip().lower()
+    if not raw_text:
+        return ""
+    normalized = unicodedata.normalize("NFKD", raw_text)
+    return "".join(char for char in normalized if not unicodedata.combining(char))
+
+
+def _search_tokens(value: object) -> List[str]:
+    normalized_text = _normalize_search_text(value)
+    if not normalized_text:
+        return []
+    return [match.group(0) for match in SEARCH_TOKEN_RE.finditer(normalized_text)]
+
+
+def _normalize_search_values(values: object) -> List[str]:
+    if isinstance(values, str):
+        raw_values = [chunk.strip() for chunk in values.split(",")]
+    elif isinstance(values, (list, tuple, set)):
+        raw_values = [str(value or "").strip() for value in values]
+    else:
+        return []
+
+    normalized_values: List[str] = []
+    for raw_value in raw_values:
+        normalized = _normalize_search_text(raw_value)
+        if normalized:
+            normalized_values.append(normalized)
+    return normalized_values
+
+
+def _row_search_values(row: Dict[str, object]) -> List[str]:
+    values: List[str] = [
+        _normalize_search_text(row.get("name")),
+        _normalize_search_text(row.get("slug")),
+    ]
+    values.extend(_normalize_search_values(row.get("tags", [])))
+    values.extend(_normalize_search_values(row.get("tools", [])))
+    return [value for value in values if value]
 
 
 def _filter_people_for_search_query(
     recipes: Sequence[Dict[str, object]],
     search_query: object,
 ) -> List[Dict[str, object]]:
-    normalized_query = _normalize_search_query(search_query)
-    if not normalized_query:
+    query_tokens = _search_tokens(search_query)
+    if not query_tokens:
         return list(recipes)
 
     filtered_rows: List[Dict[str, object]] = []
     for row in recipes:
-        searchable_values: List[str] = [
-            str(row.get("name") or "").strip().lower(),
-            str(row.get("slug") or "").strip().lower(),
-        ]
-        searchable_values.extend(str(tag or "").strip().lower() for tag in row.get("tags", []))
-        searchable_values.extend(str(tool or "").strip().lower() for tool in row.get("tools", []))
-        if any(normalized_query in value for value in searchable_values if value):
+        row_values = _row_search_values(row)
+        if not row_values:
+            continue
+
+        row_tokens: set[str] = set()
+        for value in row_values:
+            row_tokens.update(match.group(0) for match in SEARCH_TOKEN_RE.finditer(value))
+        if not row_tokens:
+            continue
+
+        if all(
+            any(row_token.startswith(query_token) for row_token in row_tokens)
+            for query_token in query_tokens
+        ):
             filtered_rows.append(row)
     return filtered_rows
 
@@ -546,6 +593,7 @@ def _update_people_cards_by_filters(
     current_tool_selection: Sequence[object] | None,
     previous_tool_selection: Sequence[object] | None,
     search_query: str,
+    previous_search_query: str,
     current_only_verified: object,
     current_view_mode: object,
 ):
@@ -575,10 +623,15 @@ def _update_people_cards_by_filters(
         search_query,
         only_verified=current_only_verified,
     )
+    current_search_query = str(search_query or "")
+    search_cleared = bool(str(previous_search_query or "").strip()) and not current_search_query.strip()
+    requested_icon_visible_count = ICON_MODE_BATCH_SIZE
+    if search_cleared and _normalize_view_mode(current_view_mode) == VIEW_MODE_ICON:
+        requested_icon_visible_count = max(ICON_MODE_BATCH_SIZE, len(filtered_rows))
     cards_html, next_icon_visible_count = _render_cards_with_incremental_icon_mode(
         filtered_rows,
         view_mode=current_view_mode,
-        icon_visible_count=ICON_MODE_BATCH_SIZE,
+        icon_visible_count=requested_icon_visible_count,
     )
     cards_update = gr.update(value=cards_html, visible=True)
 
@@ -598,6 +651,7 @@ def _update_people_cards_by_filters(
         next_tool_selection,
         next_icon_visible_count,
         cards_update,
+        current_search_query,
     )
 
 
@@ -705,6 +759,7 @@ def _load_the_list_page(request: gr.Request):
             tool_filter_selection,
             icon_visible_count,
             gr.update(value=cards_html, visible=True),
+            str(search_query or ""),
         )
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to load Recetas page: %s", exc)
@@ -731,6 +786,7 @@ def _load_the_list_page(request: gr.Request):
             [],
             ICON_MODE_BATCH_SIZE,
             gr.update(value='<div class="people-empty">No se pudieron cargar las recetas.</div>', visible=True),
+            "",
         )
 
 
@@ -814,6 +870,7 @@ def make_the_list_app() -> gr.Blocks:
             verified_only_state = gr.State(True)
             view_mode_state = gr.State(VIEW_MODE_ICON)
             icon_visible_count_state = gr.State(ICON_MODE_BATCH_SIZE)
+            search_query_state = gr.State("")
             cards_html = gr.HTML(elem_id="people-cards")
             verify_payload = gr.Textbox(
                 value="",
@@ -851,6 +908,7 @@ def make_the_list_app() -> gr.Blocks:
                 tool_filter_selection_state,
                 icon_visible_count_state,
                 cards_html,
+                search_query_state,
             ],
         )
 
@@ -868,6 +926,7 @@ def make_the_list_app() -> gr.Blocks:
                 tool_filter,
                 tool_filter_selection_state,
                 search_box,
+                search_query_state,
                 verified_only_state,
                 view_mode_state,
             ],
@@ -878,6 +937,7 @@ def make_the_list_app() -> gr.Blocks:
                 tool_filter_selection_state,
                 icon_visible_count_state,
                 cards_html,
+                search_query_state,
             ],
             show_progress=False,
         )
@@ -889,6 +949,7 @@ def make_the_list_app() -> gr.Blocks:
                 tool_filter,
                 tool_filter_selection_state,
                 search_box,
+                search_query_state,
                 verified_only_state,
                 view_mode_state,
             ],
@@ -899,6 +960,7 @@ def make_the_list_app() -> gr.Blocks:
                 tool_filter_selection_state,
                 icon_visible_count_state,
                 cards_html,
+                search_query_state,
             ],
             show_progress=False,
         )
@@ -910,6 +972,7 @@ def make_the_list_app() -> gr.Blocks:
                 tool_filter,
                 tool_filter_selection_state,
                 search_box,
+                search_query_state,
                 verified_only_state,
                 view_mode_state,
             ],
@@ -920,8 +983,10 @@ def make_the_list_app() -> gr.Blocks:
                 tool_filter_selection_state,
                 icon_visible_count_state,
                 cards_html,
+                search_query_state,
             ],
             show_progress=False,
+            trigger_mode="always_last",
         )
         verified_only_toggle.click(
             timed_page_load(

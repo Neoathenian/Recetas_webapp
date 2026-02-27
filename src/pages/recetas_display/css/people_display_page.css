@@ -21,6 +21,9 @@
   flex-wrap: nowrap;
   gap: 0.7rem;
   width: 100%;
+  position: relative;
+  overflow: visible !important;
+  z-index: 120;
 }
 
 #people-title {
@@ -102,6 +105,152 @@ button#the-list-card-edit-btn:hover,
 button#the-list-card-edit-btn:focus-visible {
   background-color: #eff6ff !important;
   border-color: #93c5fd !important;
+}
+
+#recipe-download-menu {
+  position: relative;
+  margin-top: 0 !important;
+  align-self: center !important;
+  flex: 0 0 auto !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+  z-index: 160;
+  isolation: isolate;
+}
+
+#recipe-download-menu > .wrap,
+#recipe-download-menu .gr-block,
+#recipe-download-menu .gradio-column,
+#recipe-download-menu .gradio-row,
+#recipe-download-menu [class*="wrap"],
+#recipe-download-menu [class*="container"] {
+  overflow: visible !important;
+}
+
+#the-list-download-menu-btn {
+  margin: 0 !important;
+}
+
+#the-list-download-menu-btn button,
+button#the-list-download-menu-btn {
+  min-width: 38px !important;
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 999px !important;
+  padding: 0 !important;
+  border: 1px solid #bfd5f6 !important;
+  background-color: #ffffff !important;
+  background-image: url("/images/download-button.svg");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 18px 18px;
+  color: transparent !important;
+  font-size: 0 !important;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+}
+
+#the-list-download-menu-btn button:hover,
+#the-list-download-menu-btn button:focus-visible,
+button#the-list-download-menu-btn:hover,
+button#the-list-download-menu-btn:focus-visible {
+  background-color: #eff6ff !important;
+  border-color: #93c5fd !important;
+}
+
+#recipe-download-options {
+  position: absolute;
+  top: calc(100% + 0.12rem);
+  right: 0;
+  left: auto !important;
+  display: none !important;
+  min-width: 118px;
+  width: max-content;
+  padding: 0.3rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 11px;
+  background: #ffffff;
+  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.18);
+  z-index: 260;
+}
+
+#recipe-download-options .gradio-button,
+#recipe-download-options #the-list-download-json-btn,
+#recipe-download-options #the-list-download-html-btn,
+#recipe-download-options #the-list-download-pdf-btn {
+  margin: 0 !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+#recipe-download-options button {
+  min-height: 34px !important;
+  width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  white-space: nowrap !important;
+  padding: 0 0.72rem !important;
+  border-radius: 8px !important;
+  border: 1px solid transparent !important;
+  background: #ffffff !important;
+  color: #1f2933 !important;
+  box-shadow: none !important;
+  font-size: 0.84rem !important;
+  font-weight: 700 !important;
+}
+
+#recipe-download-options button::before,
+#recipe-download-options button::after,
+#recipe-download-options [role="progressbar"],
+#recipe-download-options .progress-bar,
+#recipe-download-options .pending,
+#recipe-download-options .spinner {
+  display: none !important;
+}
+
+#recipe-download-options button:hover,
+#recipe-download-options button:focus-visible {
+  background: #eff6ff !important;
+  border-color: #bfdbfe !important;
+}
+
+#recipe-download-menu:hover #recipe-download-options,
+#recipe-download-menu:focus-within #recipe-download-options {
+  display: grid !important;
+  gap: 0.15rem;
+}
+
+#the-list-delete-btn {
+  margin-top: 0 !important;
+  align-self: center !important;
+  flex: 0 0 auto !important;
+  min-width: 0 !important;
+}
+
+#the-list-delete-btn button,
+button#the-list-delete-btn {
+  min-width: 42px !important;
+  width: 42px !important;
+  height: 42px !important;
+  border-radius: 999px !important;
+  padding: 0 !important;
+  border: 1px solid #fecaca !important;
+  background-color: #fee2e2 !important;
+  background-image: url("/images/trash_icon.svg");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 30px auto;
+  color: transparent !important;
+  font-size: 0 !important;
+  box-shadow: 0 8px 18px rgba(127, 29, 29, 0.14);
+}
+
+#the-list-delete-btn button:hover,
+#the-list-delete-btn button:focus-visible,
+button#the-list-delete-btn:hover,
+button#the-list-delete-btn:focus-visible {
+  background-color: #fecaca !important;
+  border-color: #fca5a5 !important;
 }
 
 #recipe-page-status p,

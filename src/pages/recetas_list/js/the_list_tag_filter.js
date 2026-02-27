@@ -16,6 +16,8 @@
   const TOAST_REMOVE_DELAY_MS = 4700;
   const ALL_VALUE = "all";
   const CREATED_RECIPE_QUERY_PARAM = "created_recipe";
+  const DELETED_RECIPE_QUERY_PARAM = "deleted_recipe";
+  const RECETAS_LIST_TOAST_SESSION_KEY = "recetas_list_success_toast";
 
   const ensureRoot = () => {
     if (typeof window.gradioApp === "function") {
@@ -32,7 +34,32 @@
 
   const normalizeValue = (value) => String(value || "").trim().toLowerCase();
   const TRUE_VALUES = new Set(["1", "true", "yes", "on"]);
+  const FALSE_VALUES = new Set(["0", "false", "no", "off"]);
   const isAllValue = (value) => normalizeValue(value) === ALL_VALUE;
+  const isEnabledQueryParam = (value) => {
+    if (value === null) return false;
+    const normalized = normalizeValue(value);
+    if (!normalized) return true;
+    if (TRUE_VALUES.has(normalized)) return true;
+    return !FALSE_VALUES.has(normalized);
+  };
+
+  const readSessionToastKind = () => {
+    try {
+      return normalizeValue(window.sessionStorage.getItem(RECETAS_LIST_TOAST_SESSION_KEY));
+    } catch (error) {
+      void error;
+      return "";
+    }
+  };
+
+  const clearSessionToastKind = () => {
+    try {
+      window.sessionStorage.removeItem(RECETAS_LIST_TOAST_SESSION_KEY);
+    } catch (error) {
+      void error;
+    }
+  };
 
   const dedupeValues = (values) => {
     const out = [];
@@ -83,10 +110,10 @@
     }, TOAST_REMOVE_DELAY_MS);
   };
 
-  let createdRecipeToastHandled = false;
+  let recipeQueryToastHandled = false;
 
-  const maybeShowCreatedRecipeToast = () => {
-    if (createdRecipeToastHandled) return;
+  const maybeShowRecipeQueryToast = () => {
+    if (recipeQueryToastHandled) return;
     let url;
     try {
       url = new URL(window.location.href);
@@ -95,18 +122,30 @@
       return;
     }
 
-    const rawParam = url.searchParams.get(CREATED_RECIPE_QUERY_PARAM);
-    if (rawParam === null) return;
+    const rawCreatedParam = url.searchParams.get(CREATED_RECIPE_QUERY_PARAM);
+    const rawDeletedParam = url.searchParams.get(DELETED_RECIPE_QUERY_PARAM);
+    const hasQueryToastFlag = rawCreatedParam !== null || rawDeletedParam !== null;
+    const sessionToastKind = readSessionToastKind();
+    if (!hasQueryToastFlag && !sessionToastKind) return;
 
-    createdRecipeToastHandled = true;
-    if (TRUE_VALUES.has(normalizeValue(rawParam))) {
+    recipeQueryToastHandled = true;
+    const shouldShowCreated = isEnabledQueryParam(rawCreatedParam) || sessionToastKind === "created";
+    const shouldShowDeleted = isEnabledQueryParam(rawDeletedParam) || sessionToastKind === "deleted";
+    if (shouldShowCreated) {
       showSuccessToast("Receta creada correctamente.");
     }
+    if (shouldShowDeleted) {
+      showSuccessToast("Receta eliminada correctamente.");
+    }
 
-    url.searchParams.delete(CREATED_RECIPE_QUERY_PARAM);
-    const nextSearch = url.searchParams.toString();
-    const nextUrl = `${url.pathname}${nextSearch ? `?${nextSearch}` : ""}${url.hash || ""}`;
-    window.history.replaceState(window.history.state, "", nextUrl);
+    if (hasQueryToastFlag) {
+      url.searchParams.delete(CREATED_RECIPE_QUERY_PARAM);
+      url.searchParams.delete(DELETED_RECIPE_QUERY_PARAM);
+      const nextSearch = url.searchParams.toString();
+      const nextUrl = `${url.pathname}${nextSearch ? `?${nextSearch}` : ""}${url.hash || ""}`;
+      window.history.replaceState(window.history.state, "", nextUrl);
+    }
+    clearSessionToastKind();
   };
 
   const parseValues = (scope) => {
@@ -799,7 +838,7 @@
   };
 
   const bootstrap = () => {
-    maybeShowCreatedRecipeToast();
+    maybeShowRecipeQueryToast();
     DROPDOWN_CONFIGS.forEach((config) => bindDropdown(config));
     bindCreateTrigger();
     bindVerifiedToggle();
