@@ -3415,7 +3415,7 @@
 
   const resizeRecipeStepInputControl = (input) => {
     if (!(input instanceof HTMLTextAreaElement)) return;
-    input.style.height = "auto";
+    input.style.height = "0";
     input.style.height = `${Math.max(input.scrollHeight, 32)}px`;
   };
 
@@ -3489,7 +3489,6 @@
 
     const input = document.createElement("textarea");
     input.className = "recipe-step-item__input";
-    input.rows = 1;
     input.value = normalizeRecipeStepValue(initialValue);
     input.placeholder = "Describe este paso...";
     input.setAttribute("aria-label", "Paso de preparación");
@@ -3605,6 +3604,15 @@
     });
   };
 
+  const resizeAllRecipeStepInputs = (list) => {
+    getRecipeStepItems(list).forEach((item) => {
+      const input = getRecipeStepInputControl(item);
+      if (input instanceof HTMLTextAreaElement) {
+        resizeRecipeStepInputControl(input);
+      }
+    });
+  };
+
   const renderRecipeStepsFromTextarea = (host, textarea, list) => {
     if (!(host instanceof HTMLElement) || !(textarea instanceof HTMLTextAreaElement) || !(list instanceof HTMLElement)) {
       return;
@@ -3612,20 +3620,31 @@
     const parsedSteps = parseRecipeStepsFromTextareaValue(textarea.value);
     const serialized = serializeRecipeSteps(parsedSteps);
     const previousSerialized = String(host.dataset.recipeStepsValue || "");
-    if (serialized === previousSerialized) return;
+    const needsRebuild = serialized !== previousSerialized;
 
-    list.replaceChildren();
-    parsedSteps.forEach((step) => {
-      const item = buildRecipeStepItem(host, textarea, list, step);
-      list.appendChild(item);
-    });
-    updateRecipeStepIndices(list);
-    host.dataset.recipeStepsValue = serialized;
+    if (needsRebuild) {
+      list.replaceChildren();
+      parsedSteps.forEach((step) => {
+        const item = buildRecipeStepItem(host, textarea, list, step);
+        list.appendChild(item);
+      });
+      updateRecipeStepIndices(list);
+      host.dataset.recipeStepsValue = serialized;
 
-    if (String(textarea.value || "") !== serialized) {
-      textarea.value = serialized;
-      dispatchComponentEvents(textarea);
+      if (String(textarea.value || "") !== serialized) {
+        textarea.value = serialized;
+        dispatchComponentEvents(textarea);
+      }
     }
+
+    // Double requestAnimationFrame + setTimeout ensures layout is complete before measuring
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        window.setTimeout(() => {
+          resizeAllRecipeStepInputs(list);
+        }, 50);
+      });
+    });
   };
 
   const ensureRecipeStepsEditor = () => {
@@ -3675,6 +3694,11 @@
     if (!(list instanceof HTMLElement)) return;
     bindRecipeStepsDnD(host, textarea, list);
     renderRecipeStepsFromTextarea(host, textarea, list);
+
+    // Additional resize pass after everything is set up to handle initial load
+    window.setTimeout(() => {
+      resizeAllRecipeStepInputs(list);
+    }, 200);
   };
 
   const inlineChildren = (node) =>

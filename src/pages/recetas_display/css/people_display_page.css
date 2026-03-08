@@ -1550,8 +1550,9 @@ button#recipe-import-submit-btn:focus-visible {
 
 #recipe-editor-steps-input .recipe-step-item__input {
   display: block;
+  box-sizing: border-box;
   width: 100%;
-  min-height: 2rem;
+  min-height: 0;
   border-radius: 8px;
   border: 1px solid #c6d0db;
   background: #ffffff;
@@ -1561,7 +1562,7 @@ button#recipe-import-submit-btn:focus-visible {
   font-family: inherit;
   padding: 0.33rem 0.52rem;
   resize: vertical;
-  overflow-y: hidden;
+  overflow: hidden;
 }
 
 #recipe-editor-steps-input .recipe-step-item__input:focus {
