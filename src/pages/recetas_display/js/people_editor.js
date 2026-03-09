@@ -120,6 +120,7 @@
   let citationTooltipGlobalBound = false;
   let compiledPreviewSyncTimerId = 0;
   let lastCompiledPreviewMarkdown = "";
+  let cardProposalActionsRowCache = null;
   let recipeIngredientItemCounter = 0;
   let recipeStepItemCounter = 0;
   let createdRecipeRedirectTriggered = false;
@@ -1392,7 +1393,29 @@
 
   const getCardInlineActionsSlot = () => document.getElementById(DETAIL_INLINE_ACTIONS_SLOT_ID);
 
-  const getCardProposalActionsRow = () => document.getElementById(CARD_PROPOSAL_ACTIONS_ID);
+  const getCardProposalActionsRow = () => {
+    const row = document.getElementById(CARD_PROPOSAL_ACTIONS_ID);
+    if (row instanceof HTMLElement) {
+      cardProposalActionsRowCache = row;
+      return row;
+    }
+    return cardProposalActionsRowCache instanceof HTMLElement ? cardProposalActionsRowCache : null;
+  };
+
+  const ensureCardProposalActionsMounted = () => {
+    const shell = document.getElementById(CARD_PROPOSAL_SHELL_ID);
+    const row = getCardProposalActionsRow();
+    if (!(shell instanceof HTMLElement) || !(row instanceof HTMLElement)) {
+      return { shell: null, row: null };
+    }
+
+    if (!row.isConnected || !document.body.contains(row) || !(row.parentElement instanceof HTMLElement)) {
+      shell.appendChild(row);
+      row.classList.remove("the-list-card-actions--inline");
+    }
+
+    return { shell, row };
+  };
 
   const getCardImageUploadHost = () => document.getElementById(CARD_IMAGE_UPLOAD_BUTTON_ID);
 
@@ -1594,8 +1617,7 @@
   };
 
   const dockCardProposalActions = () => {
-    const shell = document.getElementById(CARD_PROPOSAL_SHELL_ID);
-    const row = getCardProposalActionsRow();
+    const { shell, row } = ensureCardProposalActionsMounted();
     if (!(shell instanceof HTMLElement) || !(row instanceof HTMLElement)) return;
     const slot = getCardInlineActionsSlot();
     const editing = isElementVisible(shell);
