@@ -69,9 +69,22 @@ def _as_bool(value: Any) -> bool:
 
 
 def _normalize_list_values(value: Any) -> list[str]:
-    from src.recipe_categories import filter_allowed_recipe_categories
+    if isinstance(value, (list, tuple, set)):
+        raw_values = [str(item or "").strip() for item in value]
+    elif isinstance(value, str):
+        raw_values = [chunk.strip() for chunk in value.split(",")]
+    else:
+        raw_values = []
 
-    return filter_allowed_recipe_categories(value)
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in raw_values:
+        lowered = raw.lower()
+        if not lowered or lowered in seen:
+            continue
+        seen.add(lowered)
+        out.append(lowered)
+    return out
 
 
 def _normalize_image_location_in_bucket(route: Any, slug: str, images_prefix: str) -> str:

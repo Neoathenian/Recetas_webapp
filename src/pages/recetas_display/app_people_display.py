@@ -21,7 +21,6 @@ from PIL import Image, ImageDraw, ImageFont
 from src.gcs_storage import delete_prefix, get_bucket, media_path, upload_bytes
 from src.page_timing import timed_page_load
 from src.pages.header import render_header, with_light_mode_head
-from src.recipe_categories import ALLOWED_RECIPE_CATEGORIES_FOR_STORAGE, filter_allowed_recipe_categories
 from src.recipe_importer import import_recipe_from_path_or_text, recipe_payload_to_form_values
 from src.pages.recetas_list.core_the_list import (
     DEFAULT_CARD_COLOR,
@@ -128,7 +127,15 @@ def _render_missing_recipe(slug: str) -> str:
 
 
 def _normalize_values(values: Sequence[object] | None) -> List[str]:
-    return filter_allowed_recipe_categories(values)
+    parsed: List[str] = []
+    seen: set[str] = set()
+    for value in values or []:
+        normalized = str(value or "").strip().lower()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        parsed.append(normalized)
+    return parsed
 
 
 def _collect_choices(field_name: str) -> List[str]:
@@ -196,7 +203,15 @@ def _parse_steps_input(raw_value: str) -> List[str]:
 
 
 def _parse_inline_values(raw_value: str) -> List[str]:
-    return filter_allowed_recipe_categories(raw_value)
+    parsed: List[str] = []
+    seen: set[str] = set()
+    for chunk in re.split(r"[\n,]+", str(raw_value or "")):
+        normalized = str(chunk or "").strip().lower()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        parsed.append(normalized)
+    return parsed
 
 
 def _normalize_recipe_slug(raw_slug: str) -> str:
@@ -919,7 +934,8 @@ def _merge_recipe_import_payloads(payloads: Sequence[Dict[str, object]]) -> Dict
         if isinstance(raw_tags, list):
             target = merged.setdefault("Tags", [])
             if isinstance(target, list):
-                for text in filter_allowed_recipe_categories(raw_tags):
+                for item in raw_tags:
+                    text = str(item or "").strip().lower()
                     if not text or text in tag_seen:
                         continue
                     tag_seen.add(text)
@@ -1088,7 +1104,7 @@ def _recipe_page_state(
     form = _build_edit_form(recipe)
     show_top_actions = show_edit_button and bool(form["slug"])
     recipe_for_render = dict(recipe)
-    recipe_for_render["tag_catalog"] = list(ALLOWED_RECIPE_CATEGORIES_FOR_STORAGE)
+    recipe_for_render["tag_catalog"] = _collect_choices("tags")
 
     return (
         f"<h2>{html.escape(str(recipe.get('name') or 'Receta'))}</h2>",
@@ -1606,7 +1622,7 @@ def _toggle_recipe_verified_from_detail(
         )
 
     recipe_for_render = dict(recipe)
-    recipe_for_render["tag_catalog"] = list(ALLOWED_RECIPE_CATEGORIES_FOR_STORAGE)
+    recipe_for_render["tag_catalog"] = _collect_choices("tags")
     state_text = "verificada" if next_value else "sin verificar"
     return (
         gr.update(value=_render_recipe_hero(recipe_for_render), visible=True),

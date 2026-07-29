@@ -18,7 +18,6 @@ import requests
 from PIL import Image, ImageOps
 
 from src.LLMs_funcs import recipe_file_to_webapp_json, recipe_text_to_webapp_json
-from src.recipe_categories import filter_allowed_recipe_categories
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +84,17 @@ def recipe_payload_to_form_values(payload: Dict[str, Any]) -> Dict[str, str]:
                 step_lines.append(text)
 
     def _csv_list(value: object) -> str:
-        return ", ".join(filter_allowed_recipe_categories(value))
+        if not isinstance(value, list):
+            return ""
+        out: list[str] = []
+        seen: set[str] = set()
+        for item in value:
+            text = str(item or "").strip().lower()
+            if not text or text in seen:
+                continue
+            seen.add(text)
+            out.append(text)
+        return ", ".join(out)
 
     return {
         "name": str(payload.get("Name") or "Receta").strip() or "Receta",
@@ -95,12 +104,6 @@ def recipe_payload_to_form_values(payload: Dict[str, Any]) -> Dict[str, str]:
         "ingredients_text": "\n".join(ingredient_lines),
         "steps_text": "\n".join(step_lines),
     }
-
-
-def _sanitize_recipe_payload_categories(payload: Dict[str, Any]) -> Dict[str, Any]:
-    sanitized = dict(payload)
-    sanitized["Tags"] = filter_allowed_recipe_categories(sanitized.get("Tags"))
-    return sanitized
 
 
 def import_recipe_from_path_or_text(
@@ -211,8 +214,6 @@ def import_recipe_from_path_or_text(
 
     if recipe_payload_is_empty(payload):
         raise ValueError("La IA devolvió una receta vacía (sin nombre/ingredientes/pasos).")
-
-    payload = _sanitize_recipe_payload_categories(payload)
 
     image_data_url = ""
     image_source = ""
@@ -1130,5 +1131,5 @@ def _fallback_payload_from_html_jsonld(path: Path) -> Dict[str, Any] | None:
         "Total time": _parse_iso_duration(best.get("totalTime") or ""),
         "Nºpersonas": _parse_persons(best.get("recipeYield") or ""),
         "card image": DEFAULT_CARD_COLOR,
-        "Tags": filter_allowed_recipe_categories(dedup_tags),
+        "Tags": dedup_tags,
     }

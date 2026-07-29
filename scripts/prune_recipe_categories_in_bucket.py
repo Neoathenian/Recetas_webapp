@@ -59,11 +59,11 @@ def _raw_category_values(value: Any) -> list[str]:
 
 
 def _prepare_next_payload(payload: dict[str, Any]) -> tuple[dict[str, Any], list[str], list[str]]:
-    from src.recipe_categories import filter_allowed_recipe_categories, normalize_recipe_category_key
+    from src.recipe_categories import filter_baseline_recipe_categories, normalize_recipe_category_key
 
     raw_tags = payload.get("Tags") if "Tags" in payload else payload.get("tags")
     before = _raw_category_values(raw_tags)
-    after = filter_allowed_recipe_categories(raw_tags)
+    after = filter_baseline_recipe_categories(raw_tags)
     allowed_after_keys = {normalize_recipe_category_key(value) for value in after}
     removed = [
         value
@@ -162,7 +162,7 @@ def _rebuild_recipe_index_with_timeouts(
 
 
 def _validate_index_categories(bucket: Any, index_blob: str, *, timeout: float) -> int:
-    from src.recipe_categories import normalize_recipe_category_key, ALLOWED_RECIPE_CATEGORY_KEYS
+    from src.recipe_categories import normalize_recipe_category_key, BASELINE_RECIPE_CATEGORY_KEYS
 
     raw = bucket.blob(index_blob).download_as_bytes(timeout=timeout)
     reader = csv.DictReader(io.StringIO(raw.decode("utf-8-sig")))
@@ -176,7 +176,7 @@ def _validate_index_categories(bucket: Any, index_blob: str, *, timeout: float) 
             continue
         tagged_rows += 1
         for raw_tag in _raw_category_values(tags_text):
-            if normalize_recipe_category_key(raw_tag) not in ALLOWED_RECIPE_CATEGORY_KEYS:
+            if normalize_recipe_category_key(raw_tag) not in BASELINE_RECIPE_CATEGORY_KEYS:
                 invalid_counts[raw_tag.lower()] += 1
 
     print("=== Index Category Validation ===")
@@ -206,7 +206,7 @@ def main() -> int:
     parser.add_argument("--skip-index-rebuild", action="store_true", help="Do not rebuild recipes_index.csv after writing")
     parser.add_argument("--timeout", type=float, default=60.0, help="Per-request GCS timeout in seconds")
     parser.add_argument("--progress-every", type=int, default=PROGRESS_EVERY, help="Print progress every N recipe JSONs")
-    parser.add_argument("--validate-index-only", action="store_true", help="Only validate tags in the recipe index CSV")
+    parser.add_argument("--validate-index-only", action="store_true", help="Only validate tags in the recipe index CSV against the cleanup baseline")
     args = parser.parse_args()
 
     project_root = _find_project_root()
@@ -232,7 +232,7 @@ def main() -> int:
         _normalize_path_env(env_var, project_root)
 
     from src.gcs_storage import get_bucket, storage_client
-    from src.recipe_categories import ALLOWED_RECIPE_CATEGORIES
+    from src.recipe_categories import BASELINE_RECIPE_CATEGORIES
 
     recipes_prefix = (args.recipes_prefix or os.getenv("RECETAS_RECIPES_PREFIX") or "recipes").strip("/ ")
     index_blob = (args.index_blob or os.getenv("RECETAS_RECIPE_INDEX_BLOB") or f"{recipes_prefix}/recipes_index.csv").strip("/ ")
@@ -247,7 +247,7 @@ def main() -> int:
     print("index_blob =", index_blob)
     print("dry_run =", bool(args.dry_run))
     print("timeout =", float(args.timeout))
-    print("allowed_categories =", ", ".join(ALLOWED_RECIPE_CATEGORIES))
+    print("baseline_categories =", ", ".join(BASELINE_RECIPE_CATEGORIES))
 
     if args.validate_index_only:
         return _validate_index_categories(bucket, index_blob, timeout=float(args.timeout))
