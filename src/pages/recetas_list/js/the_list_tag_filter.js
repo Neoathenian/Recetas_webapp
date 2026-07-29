@@ -18,6 +18,12 @@
   const CREATED_RECIPE_QUERY_PARAM = "created_recipe";
   const DELETED_RECIPE_QUERY_PARAM = "deleted_recipe";
   const RECETAS_LIST_TOAST_SESSION_KEY = "recetas_list_success_toast";
+  const RECETAS_LIST_STATE_SESSION_KEY = "recetas_list_browser_state";
+  const LIST_STATE_QUERY_KEYS = ["q", "search", "tag", "tool", "view", "solo"];
+  const LIST_STATE_RESTORE_MAX_AGE_MS = 30 * 60 * 1000;
+  const LIST_STATE_SCROLL_RESTORE_MS = 3500;
+  const LIST_STATE_SYNC_DELAY_MS = 90;
+  const FILTER_ALL_VALUES = new Set([ALL_VALUE, "todas"]);
 
   const ensureRoot = () => {
     if (typeof window.gradioApp === "function") {
@@ -36,6 +42,7 @@
   const TRUE_VALUES = new Set(["1", "true", "yes", "on"]);
   const FALSE_VALUES = new Set(["0", "false", "no", "off"]);
   const isAllValue = (value) => normalizeValue(value) === ALL_VALUE;
+  const isFilterAllValue = (value) => FILTER_ALL_VALUES.has(normalizeValue(value));
   const isEnabledQueryParam = (value) => {
     if (value === null) return false;
     const normalized = normalizeValue(value);
@@ -85,6 +92,262 @@
     el.value = String(value ?? "");
     el.dispatchEvent(new Event("input", { bubbles: true }));
     el.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+  const isRecetasListPath = () => {
+    const path = String(window.location.pathname || "/").replace(/\/+$/, "") || "/";
+    return path === "/recetas";
+  };
+  const componentHost = (id) => {
+    const root = ensureRoot();
+    return (root && root.querySelector(`#${id}`)) || document.getElementById(id);
+  };
+  const componentScope = (id) => {
+    const host = componentHost(id);
+    if (!host) return null;
+    return host.shadowRoot || host;
+  };
+  const componentTextInput = (id) => {
+    const scope = componentScope(id);
+    if (!scope) return null;
+    return scope.querySelector("textarea, input[type='search'], input[type='text'], input:not([type])");
+  };
+  const buttonHasPrimaryVariant = (host) => {
+    if (!(host instanceof HTMLElement)) return false;
+    const candidates = [host, ...Array.from(host.querySelectorAll("button"))];
+    if (host.shadowRoot) {
+      candidates.push(...Array.from(host.shadowRoot.querySelectorAll("button")));
+    }
+    return candidates.some(
+      (node) =>
+        node instanceof HTMLElement &&
+        (node.classList.contains("primary") ||
+          node.getAttribute("variant") === "primary" ||
+          node.getAttribute("data-variant") === "primary"),
+    );
+  };
+  const readListSearchQuery = () => String(componentTextInput("people-search")?.value || "").trim();
+  const readListOnlyVerified = () => {
+    const host = componentHost("people-verified-only-toggle");
+    if (!(host instanceof HTMLElement)) return true;
+    return buttonHasPrimaryVariant(host);
+  };
+  const readListViewMode = () => {
+    const listHost = componentHost("people-view-list-toggle");
+    return buttonHasPrimaryVariant(listHost) ? "list" : "icon";
+  };
+  const readFilterValuesForUrl = (dropdownId) => {
+    const scope = componentScope(dropdownId);
+    if (!scope) return [];
+
+    const selectedValues = dedupeValues(parseValues(scope));
+    const selectedWithoutAll = selectedValues.filter((value) => !isFilterAllValue(value));
+    if (!selectedWithoutAll.length) return [];
+
+    const hasAllSelection = selectedValues.some((value) => isFilterAllValue(value));
+    const availableValues = dedupeValues(collectOptionValues(scope)).filter((value) => !isFilterAllValue(value));
+    const selectedKeys = new Set(selectedWithoutAll.map((value) => normalizeValue(value)));
+    const allAvailableSelected =
+      availableValues.length > 0 &&
+      availableValues.every((value) => selectedKeys.has(normalizeValue(value)));
+
+    if (hasAllSelection && (availableValues.length === 0 || allAvailableSelected)) return [];
+    if (allAvailableSelected && selectedWithoutAll.length >= availableValues.length) return [];
+    return selectedWithoutAll;
+  };
+  const readListState = () => ({
+    search: readListSearchQuery(),
+    tags: readFilterValuesForUrl("people-tag-filter"),
+    tools: readFilterValuesForUrl("people-tool-filter"),
+    view: readListViewMode(),
+    solo: readListOnlyVerified(),
+    scrollY: Math.max(0, Math.round(window.scrollY || document.documentElement.scrollTop || 0)),
+  });
+  const comparableListState = (state) =>
+    JSON.stringify({
+      search: String(state?.search || ""),
+      tags: state?.tags || [],
+      tools: state?.tools || [],
+      view: state?.view === "list" ? "list" : "icon",
+      solo: Boolean(state?.solo),
+    });
+
+  let listStateInitialized = false;
+  let listStateDirty = false;
+  let explicitListViewState = false;
+  let explicitListSoloState = false;
+  let listStateSyncTimer = 0;
+  let lastListStateSnapshot = "";
+  let pendingListScrollRestore = null;
+
+  const currentUrlHasListStateParams = () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return LIST_STATE_QUERY_KEYS.some((key) => params.has(key));
+    } catch (error) {
+      void error;
+      return false;
+    }
+  };
+  const initializeListStateFlags = () => {
+    if (listStateInitialized) return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      explicitListViewState = params.has("view");
+      explicitListSoloState = params.has("solo");
+    } catch (error) {
+      void error;
+    }
+    listStateInitialized = true;
+  };
+  const listUrlForState = (state) => {
+    const url = new URL(window.location.href);
+    LIST_STATE_QUERY_KEYS.forEach((key) => {
+      url.searchParams.delete(key);
+    });
+
+    const hasSearchOrFilters = Boolean(
+      String(state.search || "").trim() || (state.tags || []).length || (state.tools || []).length,
+    );
+    if (state.search) url.searchParams.set("q", state.search);
+    if ((state.tags || []).length) url.searchParams.set("tag", JSON.stringify(state.tags));
+    if ((state.tools || []).length) url.searchParams.set("tool", JSON.stringify(state.tools));
+    if (hasSearchOrFilters || explicitListViewState || state.view === "list") {
+      url.searchParams.set("view", state.view === "list" ? "list" : "icon");
+    }
+    if (hasSearchOrFilters || explicitListSoloState || !state.solo) {
+      url.searchParams.set("solo", state.solo ? "1" : "0");
+    }
+
+    const nextSearch = url.searchParams.toString();
+    return `${url.pathname}${nextSearch ? `?${nextSearch}` : ""}${url.hash || ""}`;
+  };
+  const persistListState = (state, extra = {}) => {
+    try {
+      const previous = JSON.parse(window.sessionStorage.getItem(RECETAS_LIST_STATE_SESSION_KEY) || "{}");
+      let payload = {
+        ...state,
+        ...extra,
+        url: listUrlForState(state),
+        savedAt: Date.now(),
+      };
+      if (previous?.restoreScroll && !Object.prototype.hasOwnProperty.call(extra, "restoreScroll")) {
+        payload = {
+          ...previous,
+          restoreScroll: true,
+          savedAt: previous.savedAt || payload.savedAt,
+        };
+      }
+      window.sessionStorage.setItem(RECETAS_LIST_STATE_SESSION_KEY, JSON.stringify(payload));
+    } catch (error) {
+      void error;
+    }
+  };
+  const readPersistedListState = () => {
+    try {
+      const parsed = JSON.parse(window.sessionStorage.getItem(RECETAS_LIST_STATE_SESSION_KEY) || "{}");
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (error) {
+      void error;
+      return {};
+    }
+  };
+  const writePersistedListState = (state) => {
+    try {
+      window.sessionStorage.setItem(RECETAS_LIST_STATE_SESSION_KEY, JSON.stringify(state || {}));
+    } catch (error) {
+      void error;
+    }
+  };
+  const replaceListUrlWithState = ({ force = false } = {}) => {
+    if (!isRecetasListPath()) return null;
+    initializeListStateFlags();
+
+    const state = readListState();
+    const nextSnapshot = comparableListState(state);
+    persistListState(state);
+
+    if (!lastListStateSnapshot && !force && !listStateDirty) {
+      lastListStateSnapshot = nextSnapshot;
+      return state;
+    }
+    const shouldSyncResolvedExplicitState =
+      nextSnapshot !== lastListStateSnapshot &&
+      (explicitListViewState || explicitListSoloState || currentUrlHasListStateParams());
+    if (!force && !listStateDirty && !shouldSyncResolvedExplicitState) {
+      lastListStateSnapshot = nextSnapshot;
+      return state;
+    }
+
+    const nextUrl = listUrlForState(state);
+    const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash || ""}`;
+    if (nextUrl !== currentUrl) {
+      window.history.replaceState(window.history.state, "", nextUrl);
+    }
+    lastListStateSnapshot = nextSnapshot;
+    listStateDirty = false;
+    return state;
+  };
+  const scheduleListUrlStateSync = () => {
+    if (!isRecetasListPath()) return;
+    if (listStateSyncTimer) {
+      window.clearTimeout(listStateSyncTimer);
+    }
+    listStateSyncTimer = window.setTimeout(() => {
+      listStateSyncTimer = 0;
+      replaceListUrlWithState();
+      applyPendingListScrollRestore();
+    }, LIST_STATE_SYNC_DELAY_MS);
+  };
+  const markListStateDirty = ({ view = false, solo = false } = {}) => {
+    explicitListViewState = explicitListViewState || Boolean(view);
+    explicitListSoloState = explicitListSoloState || Boolean(solo);
+    listStateDirty = true;
+    scheduleListUrlStateSync();
+  };
+  const markListStateDirtySoon = (options = {}) => {
+    window.setTimeout(() => markListStateDirty(options), 220);
+  };
+  const clearStoredListScrollRestore = () => {
+    const stored = readPersistedListState();
+    if (!stored.restoreScroll) return;
+    stored.restoreScroll = false;
+    writePersistedListState(stored);
+  };
+  const applyPendingListScrollRestore = () => {
+    if (!pendingListScrollRestore) return;
+    if (Date.now() > pendingListScrollRestore.until) {
+      pendingListScrollRestore = null;
+      clearStoredListScrollRestore();
+      return;
+    }
+
+    const targetY = Math.max(0, Number(pendingListScrollRestore.scrollY) || 0);
+    const maxScroll = Math.max(
+      0,
+      document.documentElement.scrollHeight - (window.innerHeight || document.documentElement.clientHeight || 0),
+    );
+    window.scrollTo(0, Math.min(targetY, maxScroll));
+    if (Math.abs((window.scrollY || 0) - targetY) <= 8 || maxScroll >= targetY - 8) {
+      pendingListScrollRestore = null;
+      clearStoredListScrollRestore();
+    }
+  };
+  const maybeStartListScrollRestore = () => {
+    if (!isRecetasListPath() || pendingListScrollRestore) return;
+    const stored = readPersistedListState();
+    if (!stored.restoreScroll) return;
+    if (!stored.savedAt || Date.now() - Number(stored.savedAt) > LIST_STATE_RESTORE_MAX_AGE_MS) {
+      clearStoredListScrollRestore();
+      return;
+    }
+
+    const currentState = readListState();
+    if (comparableListState(stored) !== comparableListState(currentState)) return;
+    pendingListScrollRestore = {
+      scrollY: Number(stored.scrollY) || 0,
+      until: Date.now() + LIST_STATE_SCROLL_RESTORE_MS,
+    };
+    applyPendingListScrollRestore();
   };
 
   const ensureToastRoot = () => {
@@ -837,12 +1100,75 @@
     scheduleMaybeLoadMore();
   };
 
+  const bindListStatePersistence = () => {
+    if (!isRecetasListPath()) return;
+    initializeListStateFlags();
+
+    const searchInput = componentTextInput("people-search");
+    if (searchInput instanceof HTMLElement && searchInput.dataset.recetasListStateBound !== "1") {
+      searchInput.addEventListener("input", () => markListStateDirty());
+      searchInput.addEventListener("change", () => markListStateDirty());
+      searchInput.dataset.recetasListStateBound = "1";
+    }
+
+    DROPDOWN_CONFIGS.forEach((config) => {
+      const scope = componentScope(config.id);
+      const hidden = scope ? hiddenInput(scope) : null;
+      if (!(hidden instanceof HTMLElement) || hidden.dataset.recetasListStateBound === "1") return;
+      hidden.addEventListener("input", () => markListStateDirty());
+      hidden.addEventListener("change", () => markListStateDirty());
+      hidden.dataset.recetasListStateBound = "1";
+    });
+
+    const bindButton = (id, options) => {
+      const host = componentHost(id);
+      if (!(host instanceof HTMLElement) || host.dataset.recetasListStateBound === "1") return;
+      host.addEventListener("click", () => markListStateDirtySoon(options));
+      const nestedButton = host.querySelector("button") || host.shadowRoot?.querySelector("button");
+      if (nestedButton instanceof HTMLElement) {
+        nestedButton.addEventListener("click", () => markListStateDirtySoon(options));
+      }
+      host.dataset.recetasListStateBound = "1";
+    };
+    bindButton("people-verified-only-toggle", { solo: true });
+    bindButton("people-view-icon-toggle", { view: true });
+    bindButton("people-view-list-toggle", { view: true });
+
+    const cardsHost = componentHost(CARDS_HOST_ID) || document.getElementById(CARDS_HOST_ID);
+    if (cardsHost instanceof HTMLElement && cardsHost.dataset.recetasListNavStateBound !== "1") {
+      const captureBeforeRecipeNavigation = (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        if (target.closest(".recipe-card__verified")) return;
+        const link = target.closest("a.person-card, a.recipe-list-row");
+        if (!(link instanceof HTMLAnchorElement) || !cardsHost.contains(link)) return;
+        const href = String(link.getAttribute("href") || "");
+        if (!href.startsWith("/receta/")) return;
+        const state = replaceListUrlWithState({ force: true }) || readListState();
+        persistListState(
+          {
+            ...state,
+            scrollY: Math.max(0, Math.round(window.scrollY || document.documentElement.scrollTop || 0)),
+          },
+          { restoreScroll: true },
+        );
+      };
+      cardsHost.addEventListener("click", captureBeforeRecipeNavigation, { capture: true });
+      cardsHost.addEventListener("auxclick", captureBeforeRecipeNavigation, { capture: true });
+      cardsHost.dataset.recetasListNavStateBound = "1";
+    }
+
+    scheduleListUrlStateSync();
+    maybeStartListScrollRestore();
+  };
+
   const bootstrap = () => {
     maybeShowRecipeQueryToast();
     DROPDOWN_CONFIGS.forEach((config) => bindDropdown(config));
     bindCreateTrigger();
     bindVerifiedToggle();
     bindInfiniteIconLoad();
+    bindListStatePersistence();
   };
 
   if (document.readyState === "loading") {
