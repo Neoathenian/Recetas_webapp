@@ -13,6 +13,7 @@ from src.pages.admin.common import (
     table_info_to_json,
 )
 from src.pages.admin.download_all_recipes import (
+    ADMIN_RECIPE_ZIP_DOWNLOAD_JS,
     handle_download_all_recipes_html_zip,
     handle_download_all_recipes_json_zip,
     handle_download_all_recipes_pdf_zip,
@@ -164,21 +165,42 @@ def make_admin_app() -> gr.Blocks:
                         elem_id="admin-recipes-download-menu-btn",
                     )
                     with gr.Column(elem_id="admin-recipes-download-options"):
-                        download_recipes_json_zip_btn = gr.DownloadButton(
+                        download_recipes_json_zip_btn = gr.Button(
                             "JSON",
                             variant="secondary",
                             elem_id="admin-recipes-download-json-btn",
                         )
-                        download_recipes_html_zip_btn = gr.DownloadButton(
+                        download_recipes_html_zip_btn = gr.Button(
                             "HTML",
                             variant="secondary",
                             elem_id="admin-recipes-download-html-btn",
                         )
-                        download_recipes_pdf_zip_btn = gr.DownloadButton(
+                        download_recipes_pdf_zip_btn = gr.Button(
                             "PDF",
                             variant="secondary",
                             elem_id="admin-recipes-download-pdf-btn",
                         )
+                download_recipes_json_zip_file = gr.File(
+                    label="",
+                    show_label=False,
+                    interactive=False,
+                    elem_id="admin-recipes-download-json-file",
+                    elem_classes=["bulk-recipes-download-file"],
+                )
+                download_recipes_html_zip_file = gr.File(
+                    label="",
+                    show_label=False,
+                    interactive=False,
+                    elem_id="admin-recipes-download-html-file",
+                    elem_classes=["bulk-recipes-download-file"],
+                )
+                download_recipes_pdf_zip_file = gr.File(
+                    label="",
+                    show_label=False,
+                    interactive=False,
+                    elem_id="admin-recipes-download-pdf-file",
+                    elem_classes=["bulk-recipes-download-file"],
+                )
             with gr.Column(elem_id="admin-editor-area"):
                 save_row_btn = gr.Button(
                     "Guardar fila", variant="primary", visible=False
@@ -265,6 +287,15 @@ def make_admin_app() -> gr.Blocks:
             queue=False,
             show_api=False,
         )
+        gr.on(
+            triggers=[admin_app.load],
+            fn=None,
+            inputs=None,
+            outputs=None,
+            js=ADMIN_RECIPE_ZIP_DOWNLOAD_JS,
+            queue=False,
+            show_api=False,
+        )
 
         table_list.change(
             _handle_table_select,
@@ -315,7 +346,7 @@ def make_admin_app() -> gr.Blocks:
         ).then(
             handle_download_all_recipes_json_zip,
             inputs=None,
-            outputs=[download_recipes_json_zip_btn, status],
+            outputs=[download_recipes_json_zip_file, status],
         )
         download_recipes_html_zip_btn.click(
             lambda: gr.update(value="⏳ Preparando ZIP HTML de recetas...", visible=True),
@@ -325,7 +356,7 @@ def make_admin_app() -> gr.Blocks:
         ).then(
             handle_download_all_recipes_html_zip,
             inputs=None,
-            outputs=[download_recipes_html_zip_btn, status],
+            outputs=[download_recipes_html_zip_file, status],
         )
         download_recipes_pdf_zip_btn.click(
             lambda: gr.update(value="⏳ Preparando ZIP PDF de recetas...", visible=True),
@@ -335,7 +366,7 @@ def make_admin_app() -> gr.Blocks:
         ).then(
             handle_download_all_recipes_pdf_zip,
             inputs=None,
-            outputs=[download_recipes_pdf_zip_btn, status],
+            outputs=[download_recipes_pdf_zip_file, status],
         )
 
         add_row_btn.click(

@@ -27,6 +27,140 @@ from src.pages.recetas_list.core_the_list import (
 
 logger = logging.getLogger(__name__)
 
+ADMIN_RECIPE_ZIP_DOWNLOAD_JS = r"""
+() => {
+  if (typeof window === "undefined") return [];
+
+  const TARGETS = [
+    ["admin-recipes-download-json-btn", "admin-recipes-download-json-file"],
+    ["admin-recipes-download-html-btn", "admin-recipes-download-html-file"],
+    ["admin-recipes-download-pdf-btn", "admin-recipes-download-pdf-file"],
+    ["bucket-admin-recipes-download-json-btn", "bucket-admin-recipes-download-json-file"],
+    ["bucket-admin-recipes-download-html-btn", "bucket-admin-recipes-download-html-file"],
+    ["bucket-admin-recipes-download-pdf-btn", "bucket-admin-recipes-download-pdf-file"],
+  ];
+
+  const ensureRoot = () => {
+    if (typeof window.gradioApp === "function") {
+      try {
+        const app = window.gradioApp();
+        if (app) return app;
+      } catch {}
+    }
+    const el = document.querySelector("gradio-app");
+    return el ? (el.shadowRoot || el) : document;
+  };
+
+  const root = ensureRoot();
+  if (!root) return [];
+
+  const state = window.__adminRecipeZipAutoDownloadState || {};
+  window.__adminRecipeZipAutoDownloadState = state;
+  state.pendingByFileId = state.pendingByFileId || {};
+  if (!state.boundRoots || typeof state.boundRoots.has !== "function") {
+    state.boundRoots = new WeakSet();
+  }
+
+  const findFileLink = (fileId) => {
+    const host = root.querySelector(`#${fileId}`);
+    if (!host) return null;
+    const links = Array.from(host.querySelectorAll("a[href]"));
+    return (
+      links.find((link) => {
+        const href = String(link.getAttribute("href") || "");
+        return href.includes("/file=") || href.includes("/gradio_api/file=");
+      }) || links[0] || null
+    );
+  };
+
+  const linkHref = (link) => {
+    if (!link) return "";
+    try {
+      return new URL(String(link.getAttribute("href") || ""), window.location.href).toString();
+    } catch {
+      return String(link.getAttribute("href") || "");
+    }
+  };
+
+  const currentHref = (fileId) => linkHref(findFileLink(fileId));
+
+  const triggerBrowserDownload = (link) => {
+    const href = linkHref(link);
+    if (!href) return false;
+    const anchor = document.createElement("a");
+    anchor.href = href;
+    const filename = String(link.getAttribute("download") || "").trim();
+    if (filename) anchor.download = filename;
+    anchor.style.display = "none";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    return true;
+  };
+
+  const scanPendingDownloads = () => {
+    const now = Date.now();
+    Object.keys(state.pendingByFileId).forEach((fileId) => {
+      const pending = state.pendingByFileId[fileId];
+      if (!pending) return;
+      if (now - pending.startedAt > 10 * 60 * 1000) {
+        delete state.pendingByFileId[fileId];
+        return;
+      }
+
+      const link = findFileLink(fileId);
+      const href = linkHref(link);
+      if (!href || href === pending.ignoreHref) return;
+
+      if (triggerBrowserDownload(link)) {
+        delete state.pendingByFileId[fileId];
+      }
+    });
+  };
+
+  if (!state.boundRoots.has(root)) {
+    root.addEventListener(
+      "click",
+      (event) => {
+        const target = event.target instanceof Element ? event.target : null;
+        if (!target) return;
+        for (const [buttonId, fileId] of TARGETS) {
+          const button = target.closest(`#${buttonId}, #${buttonId} button, button#${buttonId}`);
+          if (!button) continue;
+          state.pendingByFileId[fileId] = {
+            ignoreHref: currentHref(fileId),
+            startedAt: Date.now(),
+          };
+          break;
+        }
+      },
+      true,
+    );
+    state.boundRoots.add(root);
+  }
+
+  if (state.observer) {
+    try {
+      state.observer.disconnect();
+    } catch {}
+  }
+  state.observer = new MutationObserver(scanPendingDownloads);
+  state.observer.observe(root, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["href", "download"],
+  });
+
+  if (state.intervalId) {
+    window.clearInterval(state.intervalId);
+  }
+  state.intervalId = window.setInterval(scanPendingDownloads, 1000);
+  scanPendingDownloads();
+  return [];
+}
+"""
+
 
 def _resolve_bulk_export_workers() -> int:
     raw_value = str(os.getenv("RECETAS_BULK_EXPORT_WORKERS", "24")).strip()
@@ -257,10 +391,10 @@ def _handle_download_all_recipes_zip(
             progress=progress,
         )
     except ValueError as exc:
-        return gr.update(), f"❌ {exc}"
+        return None, f"❌ {exc}"
     except Exception as exc:  # pragma: no cover
         logger.exception("Failed exporting all recipes as %s ZIP.", normalized_format)
-        return gr.update(), f"❌ Error al exportar recetas ({label}): {exc}"
+        return None, f"❌ Error al exportar recetas ({label}): {exc}"
 
     progress(1.0, desc=f"ZIP {label} listo.")
     elapsed_seconds = max(0.0, time.perf_counter() - start)

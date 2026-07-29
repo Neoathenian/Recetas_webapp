@@ -164,6 +164,10 @@ button#admin-recipes-download-menu-btn:focus-visible {
   gap: 0.15rem;
 }
 
+.bulk-recipes-download-file {
+  display: none !important;
+}
+
 #admin-editor-df button[aria-label*="menu" i],
 #admin-editor-df button[aria-label*="options" i],
 #admin-editor-df [role="button"][aria-label*="menu" i],

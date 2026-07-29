@@ -72,6 +72,7 @@ from src.mount_gradio_app import mount_gradio_app
 from src.pages.recetas_list.app_the_list import make_the_list_app
 from src.pages.recetas_display.app_people_display import make_people_display_app
 from src.pages.admin.download_all_recipes import (
+    ADMIN_RECIPE_ZIP_DOWNLOAD_JS,
     handle_download_all_recipes_html_zip,
     handle_download_all_recipes_json_zip,
     handle_download_all_recipes_pdf_zip,
@@ -211,6 +212,9 @@ def _make_bucket_admin_notice_app(path: str, title: str, heading: str, message: 
       display: grid !important;
       gap: 0.15rem;
     }
+    .bulk-recipes-download-file {
+      display: none !important;
+    }
     """
 
     with gr.Blocks(title=title, css=css) as app_notice:
@@ -231,22 +235,53 @@ def _make_bucket_admin_notice_app(path: str, title: str, heading: str, message: 
                     elem_id="bucket-admin-recipes-download-menu-btn",
                 )
                 with gr.Column(elem_id="bucket-admin-recipes-download-options"):
-                    download_json_zip_btn = gr.DownloadButton(
+                    download_json_zip_btn = gr.Button(
                         "JSON",
                         variant="secondary",
                         elem_id="bucket-admin-recipes-download-json-btn",
                     )
-                    download_html_zip_btn = gr.DownloadButton(
+                    download_html_zip_btn = gr.Button(
                         "HTML",
                         variant="secondary",
                         elem_id="bucket-admin-recipes-download-html-btn",
                     )
-                    download_pdf_zip_btn = gr.DownloadButton(
+                    download_pdf_zip_btn = gr.Button(
                         "PDF",
                         variant="secondary",
                         elem_id="bucket-admin-recipes-download-pdf-btn",
                     )
+                download_json_zip_file = gr.File(
+                    label="",
+                    show_label=False,
+                    interactive=False,
+                    elem_id="bucket-admin-recipes-download-json-file",
+                    elem_classes=["bulk-recipes-download-file"],
+                )
+                download_html_zip_file = gr.File(
+                    label="",
+                    show_label=False,
+                    interactive=False,
+                    elem_id="bucket-admin-recipes-download-html-file",
+                    elem_classes=["bulk-recipes-download-file"],
+                )
+                download_pdf_zip_file = gr.File(
+                    label="",
+                    show_label=False,
+                    interactive=False,
+                    elem_id="bucket-admin-recipes-download-pdf-file",
+                    elem_classes=["bulk-recipes-download-file"],
+                )
             status = gr.Markdown(value="", visible=True)
+
+        gr.on(
+            triggers=[app_notice.load],
+            fn=None,
+            inputs=None,
+            outputs=None,
+            js=ADMIN_RECIPE_ZIP_DOWNLOAD_JS,
+            queue=False,
+            show_api=False,
+        )
 
         download_json_zip_btn.click(
             lambda: gr.update(value="⏳ Preparando ZIP JSON de recetas...", visible=True),
@@ -256,7 +291,7 @@ def _make_bucket_admin_notice_app(path: str, title: str, heading: str, message: 
         ).then(
             handle_download_all_recipes_json_zip,
             inputs=None,
-            outputs=[download_json_zip_btn, status],
+            outputs=[download_json_zip_file, status],
         )
         download_html_zip_btn.click(
             lambda: gr.update(value="⏳ Preparando ZIP HTML de recetas...", visible=True),
@@ -266,7 +301,7 @@ def _make_bucket_admin_notice_app(path: str, title: str, heading: str, message: 
         ).then(
             handle_download_all_recipes_html_zip,
             inputs=None,
-            outputs=[download_html_zip_btn, status],
+            outputs=[download_html_zip_file, status],
         )
         download_pdf_zip_btn.click(
             lambda: gr.update(value="⏳ Preparando ZIP PDF de recetas...", visible=True),
@@ -276,7 +311,7 @@ def _make_bucket_admin_notice_app(path: str, title: str, heading: str, message: 
         ).then(
             handle_download_all_recipes_pdf_zip,
             inputs=None,
-            outputs=[download_pdf_zip_btn, status],
+            outputs=[download_pdf_zip_file, status],
         )
 
     return app_notice
