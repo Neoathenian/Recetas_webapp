@@ -50,6 +50,20 @@ VIEW_MODE_ICON_LABEL = "Iconos"
 VIEW_MODE_LIST_LABEL = "Lista"
 ICON_MODE_BATCH_SIZE = 40
 SEARCH_TOKEN_RE = re.compile(r"[a-z0-9]+")
+THERMOMIX_FILTER_VALUE = "thermomix"
+REDUCED_CATEGORY_VALUES = (
+    "Thermomix",
+    "Mamá",
+    "Primer plato",
+    "Carne",
+    "Pescado",
+    "Pasta",
+    "Abolla",
+    "Abuela",
+    "Aperitivo",
+    "Bebida",
+    "Salsas",
+)
 
 
 def _log_timing(event_name: str, start: float, **fields: object) -> None:
@@ -100,15 +114,23 @@ def _render_cards_with_incremental_icon_mode(
     *,
     view_mode: object,
     icon_visible_count: object,
+    reduced_categories: object = False,
 ) -> tuple[str, int]:
     normalized_view_mode = _normalize_view_mode(view_mode)
     if normalized_view_mode == VIEW_MODE_LIST:
-        return _render_cards(recipes, view_mode=normalized_view_mode), _normalize_icon_visible_count(icon_visible_count)
+        return (
+            _render_cards(recipes, view_mode=normalized_view_mode, reduced_categories=reduced_categories),
+            _normalize_icon_visible_count(icon_visible_count),
+        )
 
     total_count = len(recipes)
     visible_count = min(total_count, _normalize_icon_visible_count(icon_visible_count))
     visible_rows = list(recipes[:visible_count])
-    cards_html = _render_cards(visible_rows, view_mode=normalized_view_mode)
+    cards_html = _render_cards(
+        visible_rows,
+        view_mode=normalized_view_mode,
+        reduced_categories=reduced_categories,
+    )
     if visible_count < total_count:
         cards_html += (
             "<div class='recipe-icon-load-sentinel' "
@@ -131,7 +153,11 @@ def _compact_values_text(values: object, *, empty_label: str) -> str:
     return html.escape(", ".join(normalized_values))
 
 
-def _render_cards(recipes: Sequence[Dict[str, object]], view_mode: object = VIEW_MODE_ICON) -> str:
+def _render_cards(
+    recipes: Sequence[Dict[str, object]],
+    view_mode: object = VIEW_MODE_ICON,
+    reduced_categories: object = False,
+) -> str:
     if not recipes:
         return '<div class="people-empty">Aún no hay recetas disponibles.</div>'
 
@@ -159,9 +185,10 @@ def _render_cards(recipes: Sequence[Dict[str, object]], view_mode: object = VIEW
         tags_raw = row.get("tags", [])
         tools_raw = row.get("tools", [])
         tag_values = [_normalize_tag(str(tag)) for tag in tags_raw if str(tag).strip()]
-        tags_markup = _render_tag_chips(tags_raw, empty_label="sin-etiquetas")
+        display_tags = _display_tags_for_preferences(tags_raw, reduced_categories)
+        tags_markup = _render_tag_chips(display_tags, empty_label="sin-etiquetas")
         tools_markup = _render_tag_chips(tools_raw, empty_label="sin-herramientas")
-        tags_list_text = _compact_values_text(tags_raw, empty_label="sin etiquetas")
+        tags_list_text = _compact_values_text(display_tags, empty_label="sin etiquetas")
         tools_list_text = _compact_values_text(tools_raw, empty_label="sin herramientas")
         tags_json_attr = html.escape(json.dumps(tag_values, ensure_ascii=True), quote=True)
 
@@ -284,6 +311,30 @@ def _normalize_search_text(value: object) -> str:
     return "".join(char for char in normalized if not unicodedata.combining(char))
 
 
+def _normalize_reduced_category_key(value: object) -> str:
+    return _normalize_search_text(value)
+
+
+def _reduced_category_keys() -> set[str]:
+    return {_normalize_reduced_category_key(value) for value in REDUCED_CATEGORY_VALUES}
+
+
+def _display_tags_for_preferences(tags: object, reduced_categories: object) -> List[str]:
+    if isinstance(tags, (list, tuple, set)):
+        normalized_tags = [str(tag or "").strip() for tag in tags if str(tag or "").strip()]
+    else:
+        normalized_tags = []
+    if not _is_truthy(reduced_categories):
+        return normalized_tags
+
+    allowed_keys = _reduced_category_keys()
+    return [
+        tag
+        for tag in normalized_tags
+        if _normalize_reduced_category_key(tag) in allowed_keys
+    ]
+
+
 def _search_tokens(value: object) -> List[str]:
     normalized_text = _normalize_search_text(value)
     if not normalized_text:
@@ -360,8 +411,10 @@ def _apply_recipe_filters(
     tool_selection: Sequence[object] | None,
     search_query: object = "",
     only_verified: object = True,
+    show_thermomix: object = True,
 ) -> List[Dict[str, object]]:
-    tag_filtered_rows = _filter_people_for_tag_selection(recipes, tag_selection)
+    visible_rows = _filter_recipes_for_thermomix_visibility(recipes, show_thermomix)
+    tag_filtered_rows = _filter_people_for_tag_selection(visible_rows, tag_selection)
     tool_filtered_rows = _filter_people_for_tool_selection(tag_filtered_rows, tool_selection)
     search_filtered_rows = _filter_people_for_search_query(tool_filtered_rows, search_query)
     return _filter_people_for_verified_selection(search_filtered_rows, only_verified)
@@ -375,11 +428,82 @@ def _is_truthy(value: object) -> bool:
     return str(value or "").strip().lower() in {"1", "true", "yes", "on", "si", "sí"}
 
 
+def _recipe_has_thermomix(row: Dict[str, object]) -> bool:
+    values: List[object] = []
+    raw_tags = row.get("tags", [])
+    raw_tools = row.get("tools", [])
+    if isinstance(raw_tags, (list, tuple, set)):
+        values.extend(raw_tags)
+    if isinstance(raw_tools, (list, tuple, set)):
+        values.extend(raw_tools)
+    return any(_normalize_tag(str(value)) == THERMOMIX_FILTER_VALUE for value in values)
+
+
+def _filter_recipes_for_thermomix_visibility(
+    recipes: Sequence[Dict[str, object]],
+    show_thermomix: object,
+) -> List[Dict[str, object]]:
+    if _is_truthy(show_thermomix):
+        return list(recipes)
+    return [row for row in recipes if not _recipe_has_thermomix(row)]
+
+
+def _build_reduced_tag_filter_choices(show_thermomix: object) -> List[tuple[str, str]]:
+    choices: List[tuple[str, str]] = [(TAG_FILTER_ALL_OPTION, TAG_FILTER_ALL_OPTION)]
+    for label in REDUCED_CATEGORY_VALUES:
+        value = _normalize_reduced_category_key(label)
+        if value == THERMOMIX_FILTER_VALUE and not _is_truthy(show_thermomix):
+            continue
+        choices.append((label, value))
+    return choices
+
+
+def _build_tag_filter_choices_for_preferences(
+    recipes: Sequence[Dict[str, object]],
+    reduced_categories: object,
+    show_thermomix: object,
+) -> List[tuple[str, str]]:
+    if _is_truthy(reduced_categories):
+        return _build_reduced_tag_filter_choices(show_thermomix)
+    return _build_tag_filter_choices(recipes)
+
+
+def _build_tag_filter_update_for_preferences(
+    recipes: Sequence[Dict[str, object]],
+    selected_values: Sequence[object] | None,
+    *,
+    default_to_all: bool,
+    reduced_categories: object,
+    show_thermomix: object,
+) -> tuple[gr.update, List[tuple[str, str]], List[str]]:
+    choices = _build_tag_filter_choices_for_preferences(recipes, reduced_categories, show_thermomix)
+    _, resolved_selection = _resolve_next_filter_selection(
+        selected_values,
+        selected_values,
+        choices,
+        all_option=TAG_FILTER_ALL_OPTION,
+    )
+    if not selected_values:
+        allowed_values = [
+            value
+            for value in _choice_values(choices)
+            if _normalize_tag(value) != _normalize_tag(TAG_FILTER_ALL_OPTION)
+        ]
+        resolved_selection = [TAG_FILTER_ALL_OPTION, *allowed_values] if default_to_all and allowed_values else []
+    return (
+        gr.update(choices=choices, value=resolved_selection, interactive=True),
+        choices,
+        resolved_selection,
+    )
+
+
 def _render_cards_for_current_filters(
     current_tag_selection: Sequence[object] | None,
     current_tool_selection: Sequence[object] | None,
     search_query: object,
     only_verified: object,
+    reduced_categories: object,
+    show_thermomix: object,
     view_mode: object,
 ) -> tuple[gr.update, int]:
     recipes = _fetch_all_people()
@@ -389,11 +513,13 @@ def _render_cards_for_current_filters(
         current_tool_selection,
         search_query,
         only_verified=only_verified,
+        show_thermomix=show_thermomix,
     )
     cards_html, resolved_icon_visible_count = _render_cards_with_incremental_icon_mode(
         filtered_rows,
         view_mode=view_mode,
         icon_visible_count=ICON_MODE_BATCH_SIZE,
+        reduced_categories=reduced_categories,
     )
     return gr.update(value=cards_html, visible=True), resolved_icon_visible_count
 
@@ -403,6 +529,8 @@ def _render_cards_for_current_filters_with_icon_count(
     current_tool_selection: Sequence[object] | None,
     search_query: object,
     only_verified: object,
+    reduced_categories: object,
+    show_thermomix: object,
     view_mode: object,
     icon_visible_count: object,
 ) -> tuple[gr.update, int]:
@@ -413,11 +541,13 @@ def _render_cards_for_current_filters_with_icon_count(
         current_tool_selection,
         search_query,
         only_verified=only_verified,
+        show_thermomix=show_thermomix,
     )
     cards_html, resolved_icon_visible_count = _render_cards_with_incremental_icon_mode(
         filtered_rows,
         view_mode=view_mode,
         icon_visible_count=icon_visible_count,
+        reduced_categories=reduced_categories,
     )
     return gr.update(value=cards_html, visible=True), resolved_icon_visible_count
 
@@ -460,6 +590,8 @@ def _set_recipe_view_mode(
     current_tool_selection: Sequence[object] | None,
     search_query: str,
     current_only_verified: object,
+    current_reduced_categories: object,
+    current_show_thermomix: object,
     current_icon_visible_count: object,
 ):
     total_start = time.perf_counter()
@@ -472,6 +604,8 @@ def _set_recipe_view_mode(
         current_tool_selection=current_tool_selection,
         search_query=search_query,
         only_verified=current_only_verified,
+        reduced_categories=current_reduced_categories,
+        show_thermomix=current_show_thermomix,
         view_mode=normalized_view_mode,
         icon_visible_count=requested_icon_count,
     )
@@ -489,6 +623,8 @@ def _switch_to_icon_view(
     current_tool_selection: Sequence[object] | None,
     search_query: str,
     current_only_verified: object,
+    current_reduced_categories: object,
+    current_show_thermomix: object,
     current_icon_visible_count: object,
 ):
     return _set_recipe_view_mode(
@@ -497,6 +633,8 @@ def _switch_to_icon_view(
         current_tool_selection=current_tool_selection,
         search_query=search_query,
         current_only_verified=current_only_verified,
+        current_reduced_categories=current_reduced_categories,
+        current_show_thermomix=current_show_thermomix,
         current_icon_visible_count=current_icon_visible_count,
     )
 
@@ -506,6 +644,8 @@ def _switch_to_list_view(
     current_tool_selection: Sequence[object] | None,
     search_query: str,
     current_only_verified: object,
+    current_reduced_categories: object,
+    current_show_thermomix: object,
     current_icon_visible_count: object,
 ):
     return _set_recipe_view_mode(
@@ -514,6 +654,8 @@ def _switch_to_list_view(
         current_tool_selection=current_tool_selection,
         search_query=search_query,
         current_only_verified=current_only_verified,
+        current_reduced_categories=current_reduced_categories,
+        current_show_thermomix=current_show_thermomix,
         current_icon_visible_count=current_icon_visible_count,
     )
 
@@ -523,6 +665,8 @@ def _toggle_verified_only_filter(
     current_tag_selection: Sequence[object] | None,
     current_tool_selection: Sequence[object] | None,
     search_query: str,
+    current_reduced_categories: object,
+    current_show_thermomix: object,
     current_view_mode: object,
     current_icon_visible_count: object,
 ):
@@ -533,6 +677,8 @@ def _toggle_verified_only_filter(
         current_tool_selection=current_tool_selection,
         search_query=search_query,
         only_verified=next_only_verified,
+        reduced_categories=current_reduced_categories,
+        show_thermomix=current_show_thermomix,
         view_mode=current_view_mode,
         icon_visible_count=ICON_MODE_BATCH_SIZE,
     )
@@ -551,6 +697,8 @@ def _toggle_recipe_verified_from_list(
     current_tool_selection: Sequence[object] | None,
     search_query: str,
     current_only_verified: object,
+    current_reduced_categories: object,
+    current_show_thermomix: object,
     current_view_mode: object,
     current_icon_visible_count: object,
 ):
@@ -575,6 +723,8 @@ def _toggle_recipe_verified_from_list(
         current_tool_selection=current_tool_selection,
         search_query=search_query,
         only_verified=current_only_verified,
+        reduced_categories=current_reduced_categories,
+        show_thermomix=current_show_thermomix,
         view_mode=current_view_mode,
         icon_visible_count=current_icon_visible_count,
     )
@@ -595,13 +745,20 @@ def _update_people_cards_by_filters(
     search_query: str,
     previous_search_query: str,
     current_only_verified: object,
+    current_reduced_categories: object,
+    current_show_thermomix: object,
     current_view_mode: object,
 ):
     total_start = time.perf_counter()
 
     recipes = _fetch_all_people()
-    tag_choices = _build_tag_filter_choices(recipes)
-    tool_choices = _build_tool_filter_choices(recipes)
+    visible_recipes = _filter_recipes_for_thermomix_visibility(recipes, current_show_thermomix)
+    tag_choices = _build_tag_filter_choices_for_preferences(
+        visible_recipes,
+        current_reduced_categories,
+        current_show_thermomix,
+    )
+    tool_choices = _build_tool_filter_choices(visible_recipes)
 
     tag_dropdown_update, next_tag_selection = _resolve_next_filter_selection(
         current_tag_selection,
@@ -622,6 +779,7 @@ def _update_people_cards_by_filters(
         next_tool_selection,
         search_query,
         only_verified=current_only_verified,
+        show_thermomix=current_show_thermomix,
     )
     current_search_query = str(search_query or "")
     search_cleared = bool(str(previous_search_query or "").strip()) and not current_search_query.strip()
@@ -632,6 +790,7 @@ def _update_people_cards_by_filters(
         filtered_rows,
         view_mode=current_view_mode,
         icon_visible_count=requested_icon_visible_count,
+        reduced_categories=current_reduced_categories,
     )
     cards_update = gr.update(value=cards_html, visible=True)
 
@@ -641,6 +800,8 @@ def _update_people_cards_by_filters(
         selected_tags=len(next_tag_selection),
         selected_tools=len(next_tool_selection),
         only_verified=_is_truthy(current_only_verified),
+        reduced_categories=_is_truthy(current_reduced_categories),
+        show_thermomix=_is_truthy(current_show_thermomix),
         search_chars=len(str(search_query or "").strip()),
         filtered_rows=len(filtered_rows),
     )
@@ -661,6 +822,8 @@ def _load_more_icon_recipes(
     current_tool_selection: Sequence[object] | None,
     search_query: str,
     current_only_verified: object,
+    current_reduced_categories: object,
+    current_show_thermomix: object,
     current_view_mode: object,
 ):
     total_start = time.perf_counter()
@@ -674,6 +837,8 @@ def _load_more_icon_recipes(
         current_tool_selection=current_tool_selection,
         search_query=search_query,
         only_verified=current_only_verified,
+        reduced_categories=current_reduced_categories,
+        show_thermomix=current_show_thermomix,
         view_mode=normalized_view_mode,
         icon_visible_count=next_requested_visible_count,
     )
@@ -701,22 +866,29 @@ def _load_the_list_page(request: gr.Request):
 
         default_view_mode = VIEW_MODE_ICON
         default_only_verified = True
+        default_reduced_categories = True
+        default_show_thermomix = True
         user = get_user(request, refresh_privileges=False) or {}
         user_email = str((user or {}).get("email") or "").strip().lower()
         if user_email:
             preferences = get_user_preferences(user_email)
             default_view_mode = _normalize_view_mode(preferences.get("recetas_view_mode"))
             default_only_verified = _is_truthy(preferences.get("recetas_only_verified"))
+            default_reduced_categories = _is_truthy(preferences.get("recetas_reduced_categories", True))
+            default_show_thermomix = _is_truthy(preferences.get("recetas_show_thermomix", True))
 
         view_mode = _normalize_view_mode(raw_view_mode or default_view_mode)
         only_verified = _is_truthy(raw_only_verified) if raw_only_verified else default_only_verified
-        tag_filter_update, _tag_filter_choices, tag_filter_selection = _build_tag_filter_update(
-            recipes,
+        visible_recipes = _filter_recipes_for_thermomix_visibility(recipes, default_show_thermomix)
+        tag_filter_update, _tag_filter_choices, tag_filter_selection = _build_tag_filter_update_for_preferences(
+            visible_recipes,
             selected_tags,
             default_to_all=False,
+            reduced_categories=default_reduced_categories,
+            show_thermomix=default_show_thermomix,
         )
         tool_filter_update, _tool_filter_choices, tool_filter_selection = _build_tool_filter_update(
-            recipes,
+            visible_recipes,
             selected_tools,
             default_to_all=False,
         )
@@ -726,11 +898,13 @@ def _load_the_list_page(request: gr.Request):
             tool_filter_selection,
             search_query,
             only_verified=only_verified,
+            show_thermomix=default_show_thermomix,
         )
         cards_html, icon_visible_count = _render_cards_with_incremental_icon_mode(
             filtered_rows,
             view_mode=view_mode,
             icon_visible_count=ICON_MODE_BATCH_SIZE,
+            reduced_categories=default_reduced_categories,
         )
         icon_view_button_update, list_view_button_update = _view_mode_button_updates(view_mode)
 
@@ -741,6 +915,8 @@ def _load_the_list_page(request: gr.Request):
             selected_tags=len(tag_filter_selection),
             selected_tools=len(tool_filter_selection),
             only_verified=only_verified,
+            reduced_categories=default_reduced_categories,
+            show_thermomix=default_show_thermomix,
             search_chars=len(str(search_query or "").strip()),
             filtered=len(filtered_rows),
         )
@@ -752,6 +928,8 @@ def _load_the_list_page(request: gr.Request):
             icon_view_button_update,
             list_view_button_update,
             only_verified,
+            default_reduced_categories,
+            default_show_thermomix,
             view_mode,
             tag_filter_update,
             tag_filter_selection,
@@ -778,6 +956,8 @@ def _load_the_list_page(request: gr.Request):
                 target_mode=VIEW_MODE_LIST,
                 label=VIEW_MODE_LIST_LABEL,
             ),
+            True,
+            True,
             True,
             VIEW_MODE_ICON,
             gr.update(choices=[(TAG_FILTER_ALL_OPTION, TAG_FILTER_ALL_OPTION)], value=[], interactive=True),
@@ -868,6 +1048,8 @@ def make_the_list_app() -> gr.Blocks:
             tag_filter_selection_state = gr.State([])
             tool_filter_selection_state = gr.State([])
             verified_only_state = gr.State(True)
+            reduced_categories_state = gr.State(True)
+            show_thermomix_state = gr.State(True)
             view_mode_state = gr.State(VIEW_MODE_ICON)
             icon_visible_count_state = gr.State(ICON_MODE_BATCH_SIZE)
             search_query_state = gr.State("")
@@ -901,6 +1083,8 @@ def make_the_list_app() -> gr.Blocks:
                 view_icon_toggle,
                 view_list_toggle,
                 verified_only_state,
+                reduced_categories_state,
+                show_thermomix_state,
                 view_mode_state,
                 tag_filter,
                 tag_filter_selection_state,
@@ -928,6 +1112,8 @@ def make_the_list_app() -> gr.Blocks:
                 search_box,
                 search_query_state,
                 verified_only_state,
+                reduced_categories_state,
+                show_thermomix_state,
                 view_mode_state,
             ],
             outputs=[
@@ -951,6 +1137,8 @@ def make_the_list_app() -> gr.Blocks:
                 search_box,
                 search_query_state,
                 verified_only_state,
+                reduced_categories_state,
+                show_thermomix_state,
                 view_mode_state,
             ],
             outputs=[
@@ -974,6 +1162,8 @@ def make_the_list_app() -> gr.Blocks:
                 search_box,
                 search_query_state,
                 verified_only_state,
+                reduced_categories_state,
+                show_thermomix_state,
                 view_mode_state,
             ],
             outputs=[
@@ -994,7 +1184,16 @@ def make_the_list_app() -> gr.Blocks:
                 _toggle_verified_only_filter,
                 label="toggle_verified_only_filter",
             ),
-            inputs=[verified_only_state, tag_filter, tool_filter, search_box, view_mode_state, icon_visible_count_state],
+            inputs=[
+                verified_only_state,
+                tag_filter,
+                tool_filter,
+                search_box,
+                reduced_categories_state,
+                show_thermomix_state,
+                view_mode_state,
+                icon_visible_count_state,
+            ],
             outputs=[verified_only_state, verified_only_toggle, icon_visible_count_state, cards_html],
             show_progress=False,
         )
@@ -1004,7 +1203,15 @@ def make_the_list_app() -> gr.Blocks:
                 _switch_to_icon_view,
                 label="switch_to_icon_view",
             ),
-            inputs=[tag_filter, tool_filter, search_box, verified_only_state, icon_visible_count_state],
+            inputs=[
+                tag_filter,
+                tool_filter,
+                search_box,
+                verified_only_state,
+                reduced_categories_state,
+                show_thermomix_state,
+                icon_visible_count_state,
+            ],
             outputs=[view_mode_state, view_icon_toggle, view_list_toggle, icon_visible_count_state, cards_html],
             show_progress=False,
         )
@@ -1014,7 +1221,15 @@ def make_the_list_app() -> gr.Blocks:
                 _switch_to_list_view,
                 label="switch_to_list_view",
             ),
-            inputs=[tag_filter, tool_filter, search_box, verified_only_state, icon_visible_count_state],
+            inputs=[
+                tag_filter,
+                tool_filter,
+                search_box,
+                verified_only_state,
+                reduced_categories_state,
+                show_thermomix_state,
+                icon_visible_count_state,
+            ],
             outputs=[view_mode_state, view_icon_toggle, view_list_toggle, icon_visible_count_state, cards_html],
             show_progress=False,
         )
@@ -1030,6 +1245,8 @@ def make_the_list_app() -> gr.Blocks:
                 tool_filter,
                 search_box,
                 verified_only_state,
+                reduced_categories_state,
+                show_thermomix_state,
                 view_mode_state,
                 icon_visible_count_state,
             ],
@@ -1042,7 +1259,16 @@ def make_the_list_app() -> gr.Blocks:
                 _load_more_icon_recipes,
                 label="load_more_icon_recipes",
             ),
-            inputs=[icon_visible_count_state, tag_filter, tool_filter, search_box, verified_only_state, view_mode_state],
+            inputs=[
+                icon_visible_count_state,
+                tag_filter,
+                tool_filter,
+                search_box,
+                verified_only_state,
+                reduced_categories_state,
+                show_thermomix_state,
+                view_mode_state,
+            ],
             outputs=[icon_visible_count_state, cards_html],
             show_progress=False,
         )

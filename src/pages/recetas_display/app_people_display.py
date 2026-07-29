@@ -10,6 +10,7 @@ import re
 import tempfile
 import textwrap
 import time
+import unicodedata
 from pathlib import Path
 from typing import Dict, List, Sequence
 from urllib.parse import unquote, urlparse
@@ -18,7 +19,9 @@ from uuid import uuid4
 import gradio as gr
 from PIL import Image, ImageDraw, ImageFont
 
+from src.bucket_identity_store import get_user_preferences
 from src.gcs_storage import delete_prefix, get_bucket, media_path, upload_bytes
+from src.login_logic import get_user
 from src.page_timing import timed_page_load
 from src.pages.header import render_header, with_light_mode_head
 from src.recipe_importer import import_recipe_from_path_or_text, recipe_payload_to_form_values
@@ -44,8 +47,20 @@ ASSETS_DIR = Path(__file__).resolve().parent
 CSS_PATH = ASSETS_DIR / "css" / "people_display_page.css"
 EDITOR_JS_PATH = ASSETS_DIR / "js" / "people_editor.js"
 RECIPE_IMAGES_PREFIX = (os.getenv("RECETAS_IMAGES_PREFIX") or "recipes/images").strip("/ ")
-TRUE_VALUES = {"1", "true", "yes", "on"}
 NEW_RECIPE_SENTINEL = "__new_recipe__"
+REDUCED_CATEGORY_VALUES = (
+    "Thermomix",
+    "Mamá",
+    "Primer plato",
+    "Carne",
+    "Pescado",
+    "Pasta",
+    "Abolla",
+    "Abuela",
+    "Aperitivo",
+    "Bebida",
+    "Salsas",
+)
 
 EDIT_TOGGLE_BUTTON_LABEL = " "
 CARD_EDITOR_HELP = "Edita la tarjeta, los ingredientes y la receta, y luego guarda."
@@ -79,6 +94,57 @@ def _load_css() -> str:
     return _read_asset(CSS_PATH)
 
 
+def _is_truthy(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on", "si", "sí"}
+
+
+def _normalize_reduced_category_key(value: object) -> str:
+    raw_text = str(value or "").strip().lower()
+    if not raw_text:
+        return ""
+    normalized = unicodedata.normalize("NFKD", raw_text)
+    return "".join(char for char in normalized if not unicodedata.combining(char))
+
+
+def _reduced_category_keys() -> set[str]:
+    return {_normalize_reduced_category_key(value) for value in REDUCED_CATEGORY_VALUES}
+
+
+def _display_tags_for_preferences(tags: object, reduced_categories: object) -> List[str]:
+    if isinstance(tags, (list, tuple, set)):
+        normalized_tags = [str(tag or "").strip() for tag in tags if str(tag or "").strip()]
+    else:
+        normalized_tags = []
+    if not _is_truthy(reduced_categories):
+        return normalized_tags
+
+    allowed_keys = _reduced_category_keys()
+    return [
+        tag
+        for tag in normalized_tags
+        if _normalize_reduced_category_key(tag) in allowed_keys
+    ]
+
+
+def _resolve_reduced_categories_preference(request: gr.Request | None) -> bool:
+    user = get_user(request, refresh_privileges=False) or {}
+    user_email = str((user or {}).get("email") or "").strip().lower()
+    if not user_email:
+        return True
+    preferences = get_user_preferences(user_email)
+    return _is_truthy(preferences.get("recetas_reduced_categories", True))
+
+
+def _recipe_for_display_preferences(recipe: Dict[str, object], reduced_categories: object) -> Dict[str, object]:
+    display_recipe = dict(recipe)
+    display_recipe["tags"] = _display_tags_for_preferences(recipe.get("tags", []), reduced_categories)
+    return display_recipe
+
+
 def _load_editor_js() -> str:
     script = _read_asset(EDITOR_JS_PATH)
     if not script:
@@ -88,14 +154,6 @@ def _load_editor_js() -> str:
 
 def _header_people_display(request: gr.Request):
     return render_header(path="/recetas", request=request)
-
-
-def _is_truthy(value: object) -> bool:
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, (int, float)):
-        return bool(value)
-    return str(value or "").strip().lower() in TRUE_VALUES
 
 
 def _bool_state(value: object) -> str:
@@ -1114,6 +1172,7 @@ def _recipe_page_state(
     recipe: Dict[str, object],
     *,
     editing: bool,
+    reduced_categories: object = False,
     page_message: str = "",
     card_message: str = "",
     current_slug_override: str | None = None,
@@ -1121,9 +1180,10 @@ def _recipe_page_state(
 ):
     form = _build_edit_form(recipe)
     show_top_actions = show_edit_button and bool(form["slug"])
-    recipe_for_render = dict(recipe)
+    recipe_for_render = _recipe_for_display_preferences(recipe, reduced_categories)
     recipe_for_render["tag_catalog"] = _collect_choices("tags")
     recipe_for_render["tool_catalog"] = _collect_choices("tools")
+    recipe_markdown = _recipe_for_display_preferences(recipe, reduced_categories)
 
     return (
         f"<h2>{html.escape(str(recipe.get('name') or 'Receta'))}</h2>",
@@ -1133,7 +1193,7 @@ def _recipe_page_state(
         gr.update(value=_bool_state(form["verified"])),
         gr.update(value=page_message, visible=bool(page_message)),
         gr.update(value=_render_recipe_hero(recipe_for_render), visible=True),
-        gr.update(value=_render_recipe_markdown(recipe), visible=not editing),
+        gr.update(value=_render_recipe_markdown(recipe_markdown), visible=not editing),
         gr.update(visible=editing),
         CARD_EDITOR_HELP,
         form["name"],
@@ -1221,6 +1281,7 @@ def _state_from_slug(
 
 def _load_people_display_page(request: gr.Request):
     try:
+        reduced_categories = _resolve_reduced_categories_preference(request)
         if _is_create_request(request):
             return _new_recipe_page_state()
 
@@ -1249,7 +1310,7 @@ def _load_people_display_page(request: gr.Request):
                 )
             return _empty_page_state("<h2>Receta no encontrada</h2>", _render_missing_recipe(normalized_slug))
 
-        return _recipe_page_state(recipe, editing=False)
+        return _recipe_page_state(recipe, editing=False, reduced_categories=reduced_categories)
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to load recipe display page: %s", exc)
         return _empty_page_state(
@@ -1257,6 +1318,10 @@ def _load_people_display_page(request: gr.Request):
             _render_missing_recipe("load-error"),
             page_message="❌ No se pudo cargar la receta.",
         )
+
+
+def _load_display_reduced_categories_state(request: gr.Request):
+    return _resolve_reduced_categories_preference(request)
 
 
 def _open_edit_mode(current_slug: str):
@@ -1598,6 +1663,7 @@ def _toggle_recipe_verified_from_detail(
     payload_json: str,
     current_slug: str,
     recipe_verified_state: str,
+    reduced_categories: object,
 ):
     try:
         payload = json.loads(payload_json or "{}")
@@ -1653,7 +1719,7 @@ def _toggle_recipe_verified_from_detail(
             gr.update(value=_bool_state(next_value)),
         )
 
-    recipe_for_render = dict(recipe)
+    recipe_for_render = _recipe_for_display_preferences(recipe, reduced_categories)
     recipe_for_render["tag_catalog"] = _collect_choices("tags")
     recipe_for_render["tool_catalog"] = _collect_choices("tools")
     state_text = "verificada" if next_value else "sin verificar"
@@ -1674,6 +1740,7 @@ def make_people_display_app() -> gr.Blocks:
     ) as app:
         hdr = gr.HTML()
         image_route_state = gr.State("")
+        reduced_categories_state = gr.State(True)
 
         with gr.Column(elem_id="people-shell"):
             with gr.Row(elem_id="people-title-row"):
@@ -1951,6 +2018,10 @@ def make_people_display_app() -> gr.Blocks:
 
         app.load(timed_page_load("/receta", _header_people_display), outputs=[hdr])
         app.load(
+            timed_page_load("/receta", _load_display_reduced_categories_state),
+            outputs=[reduced_categories_state],
+        )
+        app.load(
             timed_page_load("/receta", _load_people_display_page),
             outputs=page_state_outputs,
         )
@@ -2085,7 +2156,7 @@ def make_people_display_app() -> gr.Blocks:
                 _toggle_recipe_verified_from_detail,
                 label="toggle_recipe_verified_from_detail",
             ),
-            inputs=[detail_verify_payload, current_slug, recipe_verified_state],
+            inputs=[detail_verify_payload, current_slug, recipe_verified_state, reduced_categories_state],
             outputs=[detail_html, page_status, recipe_verified_state],
             show_progress=False,
         )
