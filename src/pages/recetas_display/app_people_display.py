@@ -317,7 +317,6 @@ def _recipe_for_export(slug: str, payload: Dict[str, object]) -> Dict[str, objec
         "total_time": str(payload.get("Total time") or "No especificado").strip() or "No especificado",
         "persons": str(payload.get("Nºpersonas") or "No especificado").strip() or "No especificado",
         "tags": _normalize_values(payload.get("Tags") if isinstance(payload.get("Tags"), list) else []),
-        "tools": _normalize_values(payload.get("Tools") if isinstance(payload.get("Tools"), list) else []),
         "ingredients": ingredients,
         "steps": steps,
         "card_image_file": str(payload.get("card image file") or payload.get("card_image_file") or "").strip(),
@@ -329,7 +328,6 @@ def _recipe_export_html_document(recipe: Dict[str, object]) -> str:
     total_time = html.escape(str(recipe.get("total_time") or "No especificado"))
     persons = html.escape(str(recipe.get("persons") or "No especificado"))
     tags = ", ".join(html.escape(str(tag or "")) for tag in recipe.get("tags", []) if str(tag or "").strip())
-    tools = ", ".join(html.escape(str(tool or "")) for tool in recipe.get("tools", []) if str(tool or "").strip())
     image_route = html.escape(str(recipe.get("card_image_file") or ""), quote=True)
     ingredients_items = []
     for ingredient_name, amount in recipe.get("ingredients", []):
@@ -354,7 +352,6 @@ def _recipe_export_html_document(recipe: Dict[str, object]) -> str:
 
     image_markup = f"<img src='{image_route}' alt='{name}'/>" if image_route else ""
     tags_text = tags or "Sin etiquetas"
-    tools_text = tools or "Sin herramientas"
 
     return f"""<!doctype html>
 <html lang="es">
@@ -422,7 +419,6 @@ def _recipe_export_html_document(recipe: Dict[str, object]) -> str:
       <div><strong>Nº personas:</strong> {persons}</div>
     </div>
     <div class="chip-row"><strong>Etiquetas:</strong> {tags_text}</div>
-    <div class="chip-row"><strong>Herramientas:</strong> {tools_text}</div>
     <section>
       <h2>Ingredientes</h2>
       <ul>
@@ -448,9 +444,7 @@ def _recipe_export_text_lines(recipe: Dict[str, object]) -> List[str]:
     lines.append(f"Tiempo total: {str(recipe.get('total_time') or 'No especificado').strip() or 'No especificado'}")
     lines.append(f"Nº personas: {str(recipe.get('persons') or 'No especificado').strip() or 'No especificado'}")
     tags = [str(tag or "").strip() for tag in recipe.get("tags", []) if str(tag or "").strip()]
-    tools = [str(tool or "").strip() for tool in recipe.get("tools", []) if str(tool or "").strip()]
     lines.append(f"Etiquetas: {', '.join(tags) if tags else 'Sin etiquetas'}")
-    lines.append(f"Herramientas: {', '.join(tools) if tools else 'Sin herramientas'}")
     lines.append("")
     lines.append("Ingredientes")
     ingredients = recipe.get("ingredients", [])
@@ -941,14 +935,12 @@ def _merge_recipe_import_payloads(payloads: Sequence[Dict[str, object]]) -> Dict
         "Nºpersonas": "No especificado",
         "card image": DEFAULT_CARD_COLOR,
         "Tags": [],
-        "Tools": [],
     }
 
     merged_ingredients: Dict[str, str] = {}
     ingredient_seen: set[str] = set()
     step_seen: set[str] = set()
     tag_seen: set[str] = set()
-    tool_seen: set[str] = set()
 
     for payload in payloads:
         if not isinstance(payload, dict):
@@ -997,19 +989,16 @@ def _merge_recipe_import_payloads(payloads: Sequence[Dict[str, object]]) -> Dict
                 if isinstance(cast_steps, list):
                     cast_steps.append(step_text)
 
-        for field_name, seen_set in (("Tags", tag_seen), ("Tools", tool_seen)):
-            raw_values = payload.get(field_name)
-            if not isinstance(raw_values, list):
-                continue
-            target = merged.setdefault(field_name, [])
-            if not isinstance(target, list):
-                continue
-            for item in raw_values:
-                text = str(item or "").strip().lower()
-                if not text or text in seen_set:
-                    continue
-                seen_set.add(text)
-                target.append(text)
+        raw_tags = payload.get("Tags")
+        if isinstance(raw_tags, list):
+            target = merged.setdefault("Tags", [])
+            if isinstance(target, list):
+                for item in raw_tags:
+                    text = str(item or "").strip().lower()
+                    if not text or text in tag_seen:
+                        continue
+                    tag_seen.add(text)
+                    target.append(text)
 
     merged["Ingredients"] = merged_ingredients
     return merged
@@ -1085,13 +1074,11 @@ def _save_recipe_image(slug: str, image_bytes: bytes, extension: str) -> str:
 
 def _build_edit_form(recipe: Dict[str, object]) -> Dict[str, str]:
     tags = _normalize_values(recipe.get("tags", []))
-    tools = _normalize_values(recipe.get("tools", []))
     return {
         "slug": str(recipe.get("slug") or "").strip(),
         "name": str(recipe.get("name") or "").strip(),
         "bucket": "",
         "tags_text": ", ".join(tags),
-        "tools_text": ", ".join(tools),
         "total_time": str(recipe.get("total_time") or "").strip(),
         "persons": str(recipe.get("persons") or "").strip(),
         "ingredients": _ingredients_to_text(recipe),
@@ -1105,7 +1092,6 @@ def _recipe_from_form_inputs(
     *,
     name: str,
     tags_text: str,
-    tools_text: str,
     total_time: str,
     persons: str,
     ingredients_text: str,
@@ -1125,7 +1111,6 @@ def _recipe_from_form_inputs(
         "card_image": DEFAULT_CARD_COLOR,
         "card_image_file": str(image_route or "").strip(),
         "tags": _parse_inline_values(tags_text),
-        "tools": _parse_inline_values(tools_text),
         "verified": bool(verified),
     }
 
@@ -1142,8 +1127,6 @@ def _empty_page_state(title_html: str, detail_html: str, page_message: str = "")
         gr.update(value="", visible=False),
         gr.update(visible=False),
         CARD_EDITOR_HELP,
-        "",
-        "",
         "",
         "",
         "",
@@ -1182,7 +1165,6 @@ def _recipe_page_state(
     show_top_actions = show_edit_button and bool(form["slug"])
     recipe_for_render = _recipe_for_display_preferences(recipe, reduced_categories)
     recipe_for_render["tag_catalog"] = _collect_choices("tags")
-    recipe_for_render["tool_catalog"] = _collect_choices("tools")
     recipe_markdown = _recipe_for_display_preferences(recipe, reduced_categories)
 
     return (
@@ -1199,7 +1181,6 @@ def _recipe_page_state(
         form["name"],
         form["bucket"],
         form["tags_text"],
-        form["tools_text"],
         form["total_time"],
         form["persons"],
         "",
@@ -1209,7 +1190,6 @@ def _recipe_page_state(
         form["name"],
         form["bucket"],
         form["tags_text"],
-        form["tools_text"],
         form["total_time"],
         form["persons"],
         form["image_route"],
@@ -1228,7 +1208,6 @@ def _new_recipe_page_state(
     card_message: str = "",
     seed_name: str = "",
     tags_text: str = "",
-    tools_text: str = "",
     total_time: str = "",
     persons: str = "",
     ingredients_text: str = "",
@@ -1239,7 +1218,6 @@ def _new_recipe_page_state(
     recipe = _recipe_from_form_inputs(
         name=seed_name,
         tags_text=tags_text,
-        tools_text=tools_text,
         total_time=total_time,
         persons=persons,
         ingredients_text=ingredients_text,
@@ -1349,7 +1327,6 @@ def _save_recipe_edits(
     card_proposal_name: str,
     _card_proposal_bucket: str,
     card_proposal_tags: str,
-    card_proposal_tools: str,
     card_proposal_total_time: str,
     card_proposal_persons: str,
     recipe_verified_state: str,
@@ -1375,7 +1352,6 @@ def _save_recipe_edits(
             card_message="❌ Indica un nombre para la nueva receta.",
             seed_name=card_proposal_name,
             tags_text=card_proposal_tags,
-            tools_text=card_proposal_tools,
             total_time=card_proposal_total_time,
             persons=card_proposal_persons,
             ingredients_text=edit_ingredients,
@@ -1399,7 +1375,6 @@ def _save_recipe_edits(
             ),
             seed_name=card_proposal_name,
             tags_text=card_proposal_tags,
-            tools_text=card_proposal_tools,
             total_time=card_proposal_total_time,
             persons=card_proposal_persons,
             ingredients_text=edit_ingredients,
@@ -1414,7 +1389,6 @@ def _save_recipe_edits(
     clean_total_time = str(card_proposal_total_time or "").strip() or "No especificado"
     clean_persons = str(card_proposal_persons or "").strip() or "No especificado"
     clean_tags = _parse_inline_values(card_proposal_tags)
-    clean_tools = _parse_inline_values(card_proposal_tools)
     ingredients = _parse_ingredients_input(edit_ingredients)
     steps = _parse_steps_input(edit_steps)
 
@@ -1427,7 +1401,6 @@ def _save_recipe_edits(
                 card_message=f"❌ {cropped_error}",
                 seed_name=card_proposal_name,
                 tags_text=card_proposal_tags,
-                tools_text=card_proposal_tools,
                 total_time=card_proposal_total_time,
                 persons=card_proposal_persons,
                 ingredients_text=edit_ingredients,
@@ -1444,7 +1417,6 @@ def _save_recipe_edits(
                 card_message=f"❌ {upload_error}",
                 seed_name=card_proposal_name,
                 tags_text=card_proposal_tags,
-                tools_text=card_proposal_tools,
                 total_time=card_proposal_total_time,
                 persons=card_proposal_persons,
                 ingredients_text=edit_ingredients,
@@ -1466,7 +1438,6 @@ def _save_recipe_edits(
                     card_message="❌ No se pudo guardar la imagen.",
                     seed_name=card_proposal_name,
                     tags_text=card_proposal_tags,
-                    tools_text=card_proposal_tools,
                     total_time=card_proposal_total_time,
                     persons=card_proposal_persons,
                     ingredients_text=edit_ingredients,
@@ -1486,7 +1457,8 @@ def _save_recipe_edits(
     next_payload.pop("card image", None)
     next_payload.pop("card_image", None)
     next_payload["Tags"] = clean_tags
-    next_payload["Tools"] = clean_tools
+    next_payload.pop("Tools", None)
+    next_payload.pop("tools", None)
     if image_route:
         next_payload["card image file"] = image_route
     else:
@@ -1498,7 +1470,6 @@ def _save_recipe_edits(
                 card_message="❌ No se pudo guardar el archivo JSON de la receta.",
                 seed_name=card_proposal_name,
                 tags_text=card_proposal_tags,
-                tools_text=card_proposal_tools,
                 total_time=card_proposal_total_time,
                 persons=card_proposal_persons,
                 ingredients_text=edit_ingredients,
@@ -1531,7 +1502,6 @@ def _import_recipe_into_editor(
     imported_text: str,
 ):
     no_change = (
-        gr.update(),
         gr.update(),
         gr.update(),
         gr.update(),
@@ -1621,7 +1591,6 @@ def _import_recipe_into_editor(
         return (
             form_values["name"],
             form_values["tags_text"],
-            form_values["tools_text"],
             form_values["total_time"],
             form_values["persons"],
             image_data_url,
@@ -1721,7 +1690,6 @@ def _toggle_recipe_verified_from_detail(
 
     recipe_for_render = _recipe_for_display_preferences(recipe, reduced_categories)
     recipe_for_render["tag_catalog"] = _collect_choices("tags")
-    recipe_for_render["tool_catalog"] = _collect_choices("tools")
     state_text = "verificada" if next_value else "sin verificar"
     return (
         gr.update(value=_render_recipe_hero(recipe_for_render), visible=True),
@@ -1808,12 +1776,6 @@ def make_people_display_app() -> gr.Blocks:
                     lines=2,
                     placeholder="Etiquetas separadas por comas",
                     elem_id="the-list-card-proposal-tags",
-                )
-                card_proposal_tools = gr.Textbox(
-                    value="",
-                    visible=False,
-                    interactive=True,
-                    elem_id="the-list-card-proposal-tools",
                 )
                 card_proposal_total_time = gr.Textbox(
                     value="",
@@ -1943,7 +1905,6 @@ def make_people_display_app() -> gr.Blocks:
                 elem_id="the-list-current-bucket",
             )
             current_tags = gr.Textbox(value="", visible=False, interactive=False, elem_id="the-list-current-tags")
-            current_tools = gr.Textbox(value="", visible=False, interactive=False, elem_id="the-list-current-tools")
             current_total_time = gr.Textbox(
                 value="",
                 visible=False,
@@ -1994,7 +1955,6 @@ def make_people_display_app() -> gr.Blocks:
             card_proposal_name,
             card_proposal_bucket,
             card_proposal_tags,
-            card_proposal_tools,
             card_proposal_total_time,
             card_proposal_persons,
             card_proposal_image_data,
@@ -2004,7 +1964,6 @@ def make_people_display_app() -> gr.Blocks:
             current_name,
             current_bucket,
             current_tags,
-            current_tools,
             current_total_time,
             current_persons,
             image_route_state,
@@ -2119,7 +2078,6 @@ def make_people_display_app() -> gr.Blocks:
                 card_proposal_name,
                 card_proposal_bucket,
                 card_proposal_tags,
-                card_proposal_tools,
                 card_proposal_total_time,
                 card_proposal_persons,
                 recipe_verified_state,
@@ -2139,7 +2097,6 @@ def make_people_display_app() -> gr.Blocks:
             outputs=[
                 card_proposal_name,
                 card_proposal_tags,
-                card_proposal_tools,
                 card_proposal_total_time,
                 card_proposal_persons,
                 card_proposal_image_data,

@@ -869,8 +869,7 @@ button#recipe-import-submit-btn:focus-visible {
   font-weight: 700;
 }
 
-.person-detail-card__tags,
-.person-detail-card__tools {
+.person-detail-card__tags {
   display: flex;
   flex-wrap: wrap;
   gap: 0.34rem;

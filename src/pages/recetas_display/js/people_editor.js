@@ -30,7 +30,6 @@
   const CARD_PROPOSAL_NAME_ID = "the-list-card-proposal-name";
   const CARD_PROPOSAL_BUCKET_ID = "the-list-card-proposal-bucket";
   const CARD_PROPOSAL_TAGS_ID = "the-list-card-proposal-tags";
-  const CARD_PROPOSAL_TOOLS_ID = "the-list-card-proposal-tools";
   const CARD_PROPOSAL_TOTAL_TIME_ID = "the-list-card-proposal-total-time";
   const CARD_PROPOSAL_PERSONS_ID = "the-list-card-proposal-persons";
   const CARD_PROPOSAL_IMAGE_DATA_ID = "the-list-card-image-data";
@@ -40,7 +39,6 @@
   const CURRENT_NAME_ID = "the-list-current-name";
   const CURRENT_BUCKET_ID = "the-list-current-bucket";
   const CURRENT_TAGS_ID = "the-list-current-tags";
-  const CURRENT_TOOLS_ID = "the-list-current-tools";
   const CURRENT_TOTAL_TIME_ID = "the-list-current-total-time";
   const CURRENT_PERSONS_ID = "the-list-current-persons";
   const DETAIL_CARD_SELECTOR = "#person-detail-hero .person-detail-card";
@@ -48,7 +46,6 @@
   const DETAIL_TITLE_SELECTOR = ".person-detail-card__title";
   const DETAIL_BUCKET_SELECTOR = ".person-detail-card__bucket";
   const DETAIL_TAGS_SELECTOR = ".person-detail-card__tags";
-  const DETAIL_TOOLS_SELECTOR = ".person-detail-card__tools";
   const DETAIL_TOTAL_TIME_VALUE_SELECTOR = ".recipe-meta-item__value--total-time";
   const DETAIL_PERSONS_VALUE_SELECTOR = ".recipe-meta-item__value--persons";
   const DETAIL_MEDIA_SELECTOR = ".person-detail-card__media";
@@ -1380,8 +1377,6 @@
   const getCardBucketNode = (card) => card?.querySelector(DETAIL_BUCKET_SELECTOR) || null;
 
   const getCardTagsHost = (card) => card?.querySelector(DETAIL_TAGS_SELECTOR) || null;
-
-  const getCardToolsHost = (card) => card?.querySelector(DETAIL_TOOLS_SELECTOR) || null;
 
   const getCardTotalTimeNode = (card) => card?.querySelector(DETAIL_TOTAL_TIME_VALUE_SELECTOR) || null;
 
@@ -2863,7 +2858,6 @@
     const titleNode = getCardTitleNode(card);
     const bucketNode = getCardBucketNode(card);
     const tagsHost = getCardTagsHost(card);
-    const toolsHost = getCardToolsHost(card);
     const totalTimeNode = getCardTotalTimeNode(card);
     const personsNode = getCardPersonsNode(card);
     const imageNode = getCardImageNode(card);
@@ -2897,7 +2891,6 @@
     const currentName = normalizeSingleLineText(getComponentValue(CURRENT_NAME_ID));
     const currentBucket = normalizeSingleLineText(getComponentValue(CURRENT_BUCKET_ID));
     const currentTags = parseTagValues(getComponentValue(CURRENT_TAGS_ID));
-    const currentTools = parseTagValues(getComponentValue(CURRENT_TOOLS_ID));
     const currentTotalTime = normalizeSingleLineText(getComponentValue(CURRENT_TOTAL_TIME_ID));
     const currentPersons = normalizeSingleLineText(getComponentValue(CURRENT_PERSONS_ID));
 
@@ -2908,10 +2901,6 @@
       parseTagValues(getComponentValue(CARD_PROPOSAL_TAGS_ID)).length > 0
         ? parseTagValues(getComponentValue(CARD_PROPOSAL_TAGS_ID))
         : currentTags;
-    const proposalTools =
-      parseTagValues(getComponentValue(CARD_PROPOSAL_TOOLS_ID)).length > 0
-        ? parseTagValues(getComponentValue(CARD_PROPOSAL_TOOLS_ID))
-        : currentTools;
     const proposalTotalTime =
       normalizeSingleLineText(getComponentValue(CARD_PROPOSAL_TOTAL_TIME_ID)) || currentTotalTime;
     const proposalPersons =
@@ -2929,13 +2918,6 @@
       renderEditableTags(tagsHost, proposalTags, {
         fieldId: CARD_PROPOSAL_TAGS_ID,
         chipLabel: "tag",
-      });
-    }
-    if (toolsHost instanceof HTMLElement) {
-      renderEditableTags(toolsHost, proposalTools, {
-        fieldId: CARD_PROPOSAL_TOOLS_ID,
-        emptyLabel: "no-tools",
-        chipLabel: "tool",
       });
     }
     if (totalTimeNode instanceof HTMLElement) {
@@ -2963,7 +2945,6 @@
     const titleNode = getCardTitleNode(card);
     const bucketNode = getCardBucketNode(card);
     const tagsHost = getCardTagsHost(card);
-    const toolsHost = getCardToolsHost(card);
     const totalTimeNode = getCardTotalTimeNode(card);
     const personsNode = getCardPersonsNode(card);
     const imageNode = getCardImageNode(card);
@@ -2984,11 +2965,6 @@
       const currentTags = parseTagValues(getComponentValue(CURRENT_TAGS_ID));
       renderReadonlyTags(tagsHost, currentTags, { emptyLabel: "no-tags" });
       setComponentValue(CARD_PROPOSAL_TAGS_ID, serializeTagValues(currentTags));
-    }
-    if (toolsHost instanceof HTMLElement) {
-      const currentTools = parseTagValues(getComponentValue(CURRENT_TOOLS_ID));
-      renderReadonlyTags(toolsHost, currentTools, { emptyLabel: "no-tools" });
-      setComponentValue(CARD_PROPOSAL_TOOLS_ID, serializeTagValues(currentTools));
     }
     if (totalTimeNode instanceof HTMLElement) {
       setInlineFieldMode(totalTimeNode, false);

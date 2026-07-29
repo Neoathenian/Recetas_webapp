@@ -19,7 +19,6 @@ from google.api_core.exceptions import NotFound
 from src.gcs_storage import download_bytes, get_bucket, media_path, storage_client, upload_bytes
 
 TAG_FILTER_ALL_OPTION = "Todas"
-TOOL_FILTER_ALL_OPTION = "Todas"
 DEFAULT_CARD_COLOR = "rgb(118, 161, 146)"
 RECIPES_PREFIX = (os.getenv("RECETAS_RECIPES_PREFIX") or "recipes").strip("/ ")
 RECIPES_INDEX_BLOB = (
@@ -293,7 +292,6 @@ def _recipe_from_payload(payload: Dict[str, object], slug_hint: str = "") -> Dic
             payload.get("card image file") or payload.get("card_image_file")
         ),
         "tags": _parse_list(payload.get("Tags") or payload.get("tags")),
-        "tools": _parse_list(payload.get("Tools") or payload.get("tools")),
         "verified": _as_bool(payload.get("Verified") if "Verified" in payload else payload.get("verified")),
     }
 
@@ -331,13 +329,12 @@ def _versioned_recipe_media_url(value: object) -> str:
 
 def _recipe_index_record_from_recipe(recipe: Dict[str, object]) -> Dict[str, str]:
     tags = [str(tag or "").strip().lower() for tag in recipe.get("tags", []) if str(tag or "").strip()]
-    tools = [str(tool or "").strip().lower() for tool in recipe.get("tools", []) if str(tool or "").strip()]
     image_blob_name = _normalize_recipe_image_bucket_path(recipe.get("card_image_file"))
     return {
         "slug": _slugify(str(recipe.get("slug") or "")),
         "recipe_name": str(recipe.get("name") or "Receta").strip() or "Receta",
         "tags": ", ".join(tags),
-        "tags_tools": ", ".join(tools),
+        "tags_tools": "",
         "Verified": "true" if bool(recipe.get("verified")) else "false",
         "image_location_in_bucket": image_blob_name,
     }
@@ -365,7 +362,6 @@ def _recipe_from_index_record(record: Dict[str, str]) -> Dict[str, object] | Non
         "card_image": DEFAULT_CARD_COLOR,
         "card_image_file": _versioned_recipe_media_url(media_path(image_blob_name)) if image_blob_name else "",
         "tags": _parse_list(record.get("tags")),
-        "tools": _parse_list(record.get("tags_tools") or record.get("tools")),
         "verified": _as_bool(record.get("Verified") if "Verified" in record else record.get("verified")),
     }
 
@@ -606,10 +602,6 @@ def _build_tag_filter_choices(people: Sequence[Dict[str, object]]) -> List[Tuple
     return _build_filter_choices(people, field_name="tags", all_option=TAG_FILTER_ALL_OPTION)
 
 
-def _build_tool_filter_choices(people: Sequence[Dict[str, object]]) -> List[Tuple[str, str]]:
-    return _build_filter_choices(people, field_name="tools", all_option=TOOL_FILTER_ALL_OPTION)
-
-
 def _resolve_filter_selection(
     choices: Sequence[object],
     selected_values: Sequence[object] | None,
@@ -663,20 +655,6 @@ def _resolve_tag_filter_selection(
     )
 
 
-def _resolve_tool_filter_selection(
-    choices: Sequence[object],
-    selected_values: Sequence[object] | None,
-    *,
-    default_to_all: bool,
-) -> List[str]:
-    return _resolve_filter_selection(
-        choices,
-        selected_values,
-        default_to_all=default_to_all,
-        all_option=TOOL_FILTER_ALL_OPTION,
-    )
-
-
 def _build_tag_filter_update(
     people: Sequence[Dict[str, object]],
     selected_values: Sequence[object] | None = None,
@@ -685,21 +663,6 @@ def _build_tag_filter_update(
 ) -> tuple[gr.update, List[Tuple[str, str]], List[str]]:
     choices = _build_tag_filter_choices(people)
     resolved_selection = _resolve_tag_filter_selection(choices, selected_values, default_to_all=default_to_all)
-    return (
-        gr.update(choices=choices, value=resolved_selection, interactive=True),
-        choices,
-        resolved_selection,
-    )
-
-
-def _build_tool_filter_update(
-    people: Sequence[Dict[str, object]],
-    selected_values: Sequence[object] | None = None,
-    *,
-    default_to_all: bool = True,
-) -> tuple[gr.update, List[Tuple[str, str]], List[str]]:
-    choices = _build_tool_filter_choices(people)
-    resolved_selection = _resolve_tool_filter_selection(choices, selected_values, default_to_all=default_to_all)
     return (
         gr.update(choices=choices, value=resolved_selection, interactive=True),
         choices,
@@ -751,18 +714,6 @@ def _filter_people_for_tag_selection(
     )
 
 
-def _filter_people_for_tool_selection(
-    people: Sequence[Dict[str, object]],
-    selected_values: Sequence[object] | None,
-) -> List[Dict[str, object]]:
-    return _filter_people_for_selection(
-        people,
-        selected_values,
-        field_name="tools",
-        all_option=TOOL_FILTER_ALL_OPTION,
-    )
-
-
 def _render_tag_chips(tags: Sequence[str], *, empty_label: str = "sin-etiquetas") -> str:
     if not tags:
         return f'<span class="person-tag person-tag--muted">{html.escape(empty_label)}</span>'
@@ -780,7 +731,6 @@ def _render_recipe_hero(recipe: Dict[str, object]) -> str:
     total_time = html.escape(str(recipe.get("total_time") or "No especificado"))
     persons = html.escape(str(recipe.get("persons") or "No especificado"))
     tags_markup = _render_tag_chips(recipe.get("tags", []), empty_label="sin-etiquetas")
-    tools_markup = _render_tag_chips(recipe.get("tools", []), empty_label="sin-herramientas")
     image_route = _versioned_recipe_media_url(recipe.get("card_image_file"))
     image_src = html.escape(image_route or TRANSPARENT_PIXEL_DATA_URL, quote=True)
     image_class = "recipe-card-color__image"
@@ -793,8 +743,6 @@ def _render_recipe_hero(recipe: Dict[str, object]) -> str:
 
     tag_catalog_values = _parse_list(recipe.get("tag_catalog") or recipe.get("tags") or [])
     tag_catalog_json = html.escape(json.dumps(tag_catalog_values, ensure_ascii=True), quote=True)
-    tool_catalog_values = _parse_list(recipe.get("tool_catalog") or recipe.get("tools") or [])
-    tool_catalog_json = html.escape(json.dumps(tool_catalog_values, ensure_ascii=True), quote=True)
     is_verified = bool(recipe.get("verified"))
     verified_class = "is-verified" if is_verified else "is-unverified"
     verified_label = "Receta verificada" if is_verified else "Receta sin verificar"
@@ -835,10 +783,6 @@ def _render_recipe_hero(recipe: Dict[str, object]) -> str:
           <span class="recipe-chip-title">Etiquetas</span>
           <div class="person-detail-card__tags" data-tag-catalog="{tag_catalog_json}" data-inline-field-id="the-list-card-proposal-tags">{tags_markup}</div>
         </div>
-        <div class="recipe-chip-section">
-          <span class="recipe-chip-title">Herramientas</span>
-          <div class="person-detail-card__tags person-detail-card__tools" data-tag-catalog="{tool_catalog_json}" data-inline-field-id="the-list-card-proposal-tools">{tools_markup}</div>
-        </div>
         <div id="person-detail-card-inline-actions-slot" class="person-detail-card__inline-actions-slot"></div>
       </div>
     </section>
@@ -870,7 +814,6 @@ def _generate_recipe_markdown(recipe: Dict[str, object]) -> str:
     total_time = str(recipe.get("total_time") or "No especificado").strip()
     persons = str(recipe.get("persons") or "No especificado").strip()
     tags = ", ".join(str(tag or "").strip() for tag in recipe.get("tags", [])) or "Sin etiquetas"
-    tools = ", ".join(str(tool or "").strip() for tool in recipe.get("tools", [])) or "Sin herramientas"
     ingredients_block = "\n".join(ingredient_lines) if ingredient_lines else "- No se proporcionaron ingredientes."
     steps_block = "\n".join(step_lines) if step_lines else "1. No se proporcionaron pasos de preparación."
 
@@ -878,8 +821,7 @@ def _generate_recipe_markdown(recipe: Dict[str, object]) -> str:
         "## Resumen de la receta\n"
         f"- **Tiempo total:** {total_time}\n"
         f"- **N\u00bapersonas:** {persons}\n"
-        f"- **Etiquetas:** {tags}\n"
-        f"- **Herramientas:** {tools}\n\n"
+        f"- **Etiquetas:** {tags}\n\n"
         "## Ingredientes\n"
         f"{ingredients_block}\n\n"
         "## Preparación\n"

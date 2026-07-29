@@ -3,7 +3,6 @@
 
   const DROPDOWN_CONFIGS = [
     { id: "people-tag-filter", placeholder: "Filtrar por etiquetas", singular: "etiqueta", plural: "etiquetas" },
-    { id: "people-tool-filter", placeholder: "Filtrar por herramientas", singular: "herramienta", plural: "herramientas" },
   ];
   const CREATE_TRIGGER_ID = "the-list-create-profile-trigger";
   const CREATE_PAGE_PATH = "/receta/?create=1";
@@ -157,7 +156,6 @@
   const readListState = () => ({
     search: readListSearchQuery(),
     tags: readFilterValuesForUrl("people-tag-filter"),
-    tools: readFilterValuesForUrl("people-tool-filter"),
     view: readListViewMode(),
     solo: readListOnlyVerified(),
     scrollY: Math.max(0, Math.round(window.scrollY || document.documentElement.scrollTop || 0)),
@@ -166,7 +164,6 @@
     JSON.stringify({
       search: String(state?.search || ""),
       tags: state?.tags || [],
-      tools: state?.tools || [],
       view: state?.view === "list" ? "list" : "icon",
       solo: Boolean(state?.solo),
     });
@@ -205,12 +202,9 @@
       url.searchParams.delete(key);
     });
 
-    const hasSearchOrFilters = Boolean(
-      String(state.search || "").trim() || (state.tags || []).length || (state.tools || []).length,
-    );
+    const hasSearchOrFilters = Boolean(String(state.search || "").trim() || (state.tags || []).length);
     if (state.search) url.searchParams.set("q", state.search);
     if ((state.tags || []).length) url.searchParams.set("tag", JSON.stringify(state.tags));
-    if ((state.tools || []).length) url.searchParams.set("tool", JSON.stringify(state.tools));
     if (hasSearchOrFilters || explicitListViewState || state.view === "list") {
       url.searchParams.set("view", state.view === "list" ? "list" : "icon");
     }

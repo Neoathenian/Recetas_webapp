@@ -513,7 +513,6 @@ RECIPE_WEBAPP_KEYS = [
     "Total time",
     "Nºpersonas",
     "Tags",
-    "Tools",
 ]
 
 
@@ -588,7 +587,6 @@ def normalize_recipe_webapp_payload(
         "Nºpersonas": str(payload.get("Nºpersonas") or payload.get("n_personas") or payload.get("persons") or "").strip()
         or "No especificado",
         "Tags": _normalize_recipe_list(payload.get("Tags") if "Tags" in payload else payload.get("tags")),
-        "Tools": _normalize_recipe_list(payload.get("Tools") if "Tools" in payload else payload.get("tools")),
     }
 
     card_image_file = str(payload.get("card image file") or payload.get("card_image_file") or "").strip()
@@ -617,7 +615,7 @@ def recipe_text_to_webapp_json(
 
         Rules:
         - "Ingredients" must be a JSON object mapping ingredient name -> amount.
-        - "Steps", "Tags", and "Tools" must be JSON arrays of strings.
+        - "Steps" and "Tags" must be JSON arrays of strings.
         - Preserve the source step structure exactly: keep the same step order and the same number of steps found in the recipe.
         - For "Steps", transcribe the original step text as literally as possible from the source. Do not summarize, merge, split, rewrite, or paraphrase steps.
         - Keep quantities, times, temperatures, and wording in each step exactly as shown whenever readable.
@@ -681,7 +679,7 @@ def recipe_file_to_webapp_json(
 
         Rules:
         - "Ingredients" must be a JSON object mapping ingredient name -> amount.
-        - "Steps", "Tags", and "Tools" must be JSON arrays of strings.
+        - "Steps" and "Tags" must be JSON arrays of strings.
         - Preserve the source step structure exactly: keep the same step order and the same number of steps found in the recipe.
         - For "Steps", transcribe the original step text as literally as possible from the file/OCR. Do not summarize, merge, split, rewrite, or paraphrase steps.
         - Keep quantities, times, temperatures, and wording in each step exactly as shown whenever readable.

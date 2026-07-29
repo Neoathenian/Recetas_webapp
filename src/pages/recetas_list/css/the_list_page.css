@@ -133,20 +133,7 @@
   box-shadow: none !important;
 }
 
-#people-tool-filter {
-  width: 230px;
-  max-width: 230px;
-  min-width: 180px;
-  --block-border-width: 0;
-  --block-padding: 0;
-  --block-background-fill: transparent;
-  border: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-}
-
-#people-tag-filter .wrap,
-#people-tool-filter .wrap {
+#people-tag-filter .wrap {
   position: relative;
   min-height: 20px;
   border-radius: 10px;
@@ -155,19 +142,16 @@
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-#people-tag-filter .wrap:hover,
-#people-tool-filter .wrap:hover {
+#people-tag-filter .wrap:hover {
   border-color: #92a0ad;
 }
 
-#people-tag-filter .wrap:focus-within,
-#people-tool-filter .wrap:focus-within {
+#people-tag-filter .wrap:focus-within {
   border-color: #4b7a66;
   box-shadow: 0 0 0 2px rgba(75, 122, 102, 0.15);
 }
 
-#people-tag-filter .wrap::after,
-#people-tool-filter .wrap::after {
+#people-tag-filter .wrap::after {
   content: attr(data-summary);
   position: absolute;
   left: 10px;
@@ -179,18 +163,14 @@
 }
 
 #people-tag-filter input[type="text"],
-#people-tag-filter .wrap input,
-#people-tool-filter input[type="text"],
-#people-tool-filter .wrap input {
+#people-tag-filter .wrap input {
   min-height: 20px;
   color: transparent !important;
   caret-color: #1f2933;
 }
 
 #people-tag-filter input[type="text"]::placeholder,
-#people-tag-filter .wrap input::placeholder,
-#people-tool-filter input[type="text"]::placeholder,
-#people-tool-filter .wrap input::placeholder {
+#people-tag-filter .wrap input::placeholder {
   color: transparent !important;
 }
 
@@ -406,10 +386,10 @@ button#people-view-list-toggle:focus-visible {
 .recipe-list-table__header,
 .recipe-list-row {
   display: grid;
-  grid-template-columns: minmax(230px, 1.66fr) minmax(180px, 1fr) minmax(180px, 1fr) minmax(72px, 0.28fr);
+  grid-template-columns: minmax(230px, 1.66fr) minmax(220px, 1fr) minmax(72px, 0.28fr);
   align-items: center;
   column-gap: 0.68rem;
-  min-width: 660px;
+  min-width: 520px;
 }
 
 .recipe-list-table__header {
@@ -757,12 +737,6 @@ button#people-view-list-toggle:focus-visible {
     min-width: 130px;
   }
 
-  #people-tool-filter {
-    width: min(48vw, 220px);
-    max-width: 220px;
-    min-width: 140px;
-  }
-
   #the-list-create-profile-trigger {
     margin-left: auto;
   }
@@ -774,8 +748,8 @@ button#people-view-list-toggle:focus-visible {
 
   .recipe-list-table__header,
   .recipe-list-row {
-    grid-template-columns: minmax(180px, 1.52fr) minmax(150px, 1fr) minmax(150px, 1fr) minmax(64px, 0.26fr);
-    min-width: 580px;
+    grid-template-columns: minmax(180px, 1.52fr) minmax(160px, 1fr) minmax(64px, 0.26fr);
+    min-width: 440px;
   }
 
   .recipe-list-table__head {

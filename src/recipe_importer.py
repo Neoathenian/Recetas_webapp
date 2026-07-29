@@ -63,7 +63,6 @@ def recipe_payload_to_form_values(payload: Dict[str, Any]) -> Dict[str, str]:
     ingredients = payload.get("Ingredients")
     steps = payload.get("Steps")
     tags = payload.get("Tags")
-    tools = payload.get("Tools")
 
     ingredient_lines: list[str] = []
     if isinstance(ingredients, dict):
@@ -100,7 +99,6 @@ def recipe_payload_to_form_values(payload: Dict[str, Any]) -> Dict[str, str]:
     return {
         "name": str(payload.get("Name") or "Receta").strip() or "Receta",
         "tags_text": _csv_list(tags),
-        "tools_text": _csv_list(tools),
         "total_time": str(payload.get("Total time") or "No especificado").strip() or "No especificado",
         "persons": str(payload.get("Nºpersonas") or "No especificado").strip() or "No especificado",
         "ingredients_text": "\n".join(ingredient_lines),
@@ -1084,7 +1082,6 @@ def _fallback_payload_from_plain_text(path: Path | None, raw_text: str) -> Dict[
         "Total time": "No especificado",
         "Nºpersonas": "No especificado",
         "Tags": [],
-        "Tools": [],
     }
 
 
@@ -1135,5 +1132,4 @@ def _fallback_payload_from_html_jsonld(path: Path) -> Dict[str, Any] | None:
         "Nºpersonas": _parse_persons(best.get("recipeYield") or ""),
         "card image": DEFAULT_CARD_COLOR,
         "Tags": dedup_tags,
-        "Tools": [],
     }

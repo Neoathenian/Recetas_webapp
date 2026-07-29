@@ -117,7 +117,6 @@ def _record_from_payload(payload: dict[str, Any], *, slug_hint: str, images_pref
     slug = _slugify(str(payload.get("slug") or slug_hint))
     recipe_name = str(payload.get("Name") or payload.get("name") or slug.replace("-", " ").title()).strip() or "Receta"
     tags = _normalize_list_values(payload.get("Tags") if "Tags" in payload else payload.get("tags"))
-    tools = _normalize_list_values(payload.get("Tools") if "Tools" in payload else payload.get("tools"))
     verified_raw = payload.get("Verified") if "Verified" in payload else payload.get("verified")
     image_route = payload.get("card image file") if "card image file" in payload else payload.get("card_image_file")
     image_location = _normalize_image_location_in_bucket(image_route, slug, images_prefix)
@@ -125,7 +124,7 @@ def _record_from_payload(payload: dict[str, Any], *, slug_hint: str, images_pref
         "slug": slug,
         "recipe_name": recipe_name,
         "tags": ", ".join(tags),
-        "tags_tools": ", ".join(tools),
+        "tags_tools": "",
         "Verified": "true" if _as_bool(verified_raw) else "false",
         "image_location_in_bucket": image_location,
     }
