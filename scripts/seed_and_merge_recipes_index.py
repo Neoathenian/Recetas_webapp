@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import io
 import json
 import os
 import re
@@ -70,22 +69,9 @@ def _as_bool(value: Any) -> bool:
 
 
 def _normalize_list_values(value: Any) -> list[str]:
-    if isinstance(value, (list, tuple, set)):
-        raw_values = [str(item or "").strip() for item in value]
-    elif isinstance(value, str):
-        raw_values = [chunk.strip() for chunk in value.split(",")]
-    else:
-        raw_values = []
+    from src.recipe_categories import filter_allowed_recipe_categories
 
-    out: list[str] = []
-    seen: set[str] = set()
-    for raw in raw_values:
-        lowered = raw.lower()
-        if not lowered or lowered in seen:
-            continue
-        seen.add(lowered)
-        out.append(lowered)
-    return out
+    return filter_allowed_recipe_categories(value)
 
 
 def _normalize_image_location_in_bucket(route: Any, slug: str, images_prefix: str) -> str:

@@ -123,7 +123,6 @@ def empty_user_preferences() -> Dict[str, object]:
     return {
         "recetas_view_mode": RECETAS_VIEW_MODE_ICON,
         "recetas_only_verified": True,
-        "recetas_reduced_categories": True,
         "recetas_show_thermomix": True,
     }
 
@@ -137,7 +136,6 @@ def get_user_preferences(email: str | None) -> Dict[str, object]:
     raw = _download_json_blob(_user_preferences_blob_name(normalized_email)) or {}
     preferences["recetas_view_mode"] = _normalize_recetas_view_mode(raw.get("recetas_view_mode"))
     preferences["recetas_only_verified"] = _is_truthy(raw.get("recetas_only_verified", True))
-    preferences["recetas_reduced_categories"] = _is_truthy(raw.get("recetas_reduced_categories", True))
     preferences["recetas_show_thermomix"] = _is_truthy(raw.get("recetas_show_thermomix", True))
     return preferences
 
@@ -147,7 +145,6 @@ def set_user_preferences(
     *,
     recetas_view_mode: object | None = None,
     recetas_only_verified: object | None = None,
-    recetas_reduced_categories: object | None = None,
     recetas_show_thermomix: object | None = None,
 ) -> Dict[str, object]:
     normalized_email = _normalize_email(email)
@@ -159,8 +156,6 @@ def set_user_preferences(
         current["recetas_view_mode"] = _normalize_recetas_view_mode(recetas_view_mode)
     if recetas_only_verified is not None:
         current["recetas_only_verified"] = _is_truthy(recetas_only_verified)
-    if recetas_reduced_categories is not None:
-        current["recetas_reduced_categories"] = _is_truthy(recetas_reduced_categories)
     if recetas_show_thermomix is not None:
         current["recetas_show_thermomix"] = _is_truthy(recetas_show_thermomix)
 

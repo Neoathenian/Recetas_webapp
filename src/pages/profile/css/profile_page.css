@@ -141,7 +141,6 @@ button#profile-view-list-btn.secondary {
 }
 
 #profile-recetas-only-verified,
-#profile-recetas-reduced-categories,
 #profile-recetas-show-thermomix {
   border: 1px solid #d4ddf1;
   border-radius: 0.88rem;
@@ -150,14 +149,12 @@ button#profile-view-list-btn.secondary {
 }
 
 #profile-recetas-only-verified label,
-#profile-recetas-reduced-categories label,
 #profile-recetas-show-thermomix label {
   color: #17253d;
   font-weight: 600;
 }
 
 #profile-recetas-only-verified input[type="checkbox"],
-#profile-recetas-reduced-categories input[type="checkbox"],
 #profile-recetas-show-thermomix input[type="checkbox"] {
   accent-color: var(--profile-accent) !important;
 }

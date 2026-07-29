@@ -17,6 +17,7 @@ import gradio as gr
 from google.api_core.exceptions import NotFound
 
 from src.gcs_storage import download_bytes, get_bucket, media_path, storage_client, upload_bytes
+from src.recipe_categories import filter_allowed_recipe_categories
 
 TAG_FILTER_ALL_OPTION = "Todas"
 DEFAULT_CARD_COLOR = "rgb(118, 161, 146)"
@@ -209,22 +210,7 @@ def _as_bool(value: object) -> bool:
 
 
 def _parse_list(value: object) -> List[str]:
-    if isinstance(value, (list, tuple, set)):
-        raw_values = [str(item or "").strip() for item in value]
-    elif isinstance(value, str):
-        raw_values = [chunk.strip() for chunk in value.split(",")]
-    else:
-        raw_values = []
-
-    parsed: List[str] = []
-    seen: set[str] = set()
-    for raw_item in raw_values:
-        normalized = _normalize_tag(raw_item)
-        if not normalized or normalized in seen:
-            continue
-        seen.add(normalized)
-        parsed.append(normalized)
-    return parsed
+    return filter_allowed_recipe_categories(value)
 
 
 def _parse_ingredients(value: object) -> List[Tuple[str, str]]:
@@ -328,7 +314,7 @@ def _versioned_recipe_media_url(value: object) -> str:
 
 
 def _recipe_index_record_from_recipe(recipe: Dict[str, object]) -> Dict[str, str]:
-    tags = [str(tag or "").strip().lower() for tag in recipe.get("tags", []) if str(tag or "").strip()]
+    tags = filter_allowed_recipe_categories(recipe.get("tags", []))
     image_blob_name = _normalize_recipe_image_bucket_path(recipe.get("card_image_file"))
     return {
         "slug": _slugify(str(recipe.get("slug") or "")),
